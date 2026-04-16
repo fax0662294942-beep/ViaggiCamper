@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v4.9</title>
+<title>🚐 Viaggi Camper v5.4</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -112,10 +112,33 @@ button:active{transform:scale(.97)}
 .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
 
 /* ── Tappe list ── */
-.tappa-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:8px}
+/* ── Tappa budget chain ── */
+.tappa-chain{display:flex;flex-direction:column;gap:0;margin-bottom:16px}
+.tappa-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:8px}
+.tappa-item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 14px 8px}
 .tappa-info{flex:1}
 .tappa-name{font-weight:600;font-size:13px}
 .tappa-meta{font-size:12px;color:var(--text2);margin-top:3px}
+.tappa-budget-bar{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)}
+.tappa-budget-cell{padding:8px 10px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border)}
+.tappa-budget-cell:last-child{border-right:none}
+.tbc-label{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.tbc-val{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text)}
+.tbc-val.pos{color:var(--green)}
+.tbc-val.neg{color:var(--red)}
+.tbc-val.primary{color:var(--primary)}
+.tbc-val.muted{color:var(--text2);font-size:12px;font-weight:400;font-family:inherit}
+.tappa-budget-input{
+  background:transparent;border:none;border-bottom:1px dashed var(--border2);
+  color:var(--text);font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+  width:100%;padding:2px 0;
+}
+.tappa-budget-input:focus{outline:none;border-bottom-color:var(--primary-dim)}
+.tappa-riporto{text-align:center;padding:2px 0 6px;font-size:11px;color:var(--text3)}
+.budget-unallocated{
+  background:var(--accent-faint);border:1px solid rgba(240,160,69,.25);border-radius:10px;
+  padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-top:8px;
+}
 .badge{display:inline-block;background:var(--primary-faint);color:var(--primary);border:1px solid rgba(79,216,180,.2);border-radius:5px;padding:1px 7px;font-size:11px;font-weight:600}
 .badge.accent{background:var(--accent-faint);color:var(--accent);border-color:rgba(240,160,69,.2)}
 
@@ -271,6 +294,36 @@ th.th-group-sep{border-left:2px solid var(--border2)!important}
 .pan-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
 .pan-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
 
+/* ── Delta view ── */
+.delta-wrap{margin-top:8px;display:flex;flex-direction:column;gap:14px}
+.delta-table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.delta-table th{
+  background:var(--card2);padding:8px 12px;font-size:11px;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;color:var(--text3);
+  border-bottom:2px solid var(--border2);text-align:right;
+}
+.delta-table th:first-child{text-align:left}
+.delta-table td{
+  padding:8px 12px;font-size:13px;border-bottom:1px solid var(--border);
+  text-align:right;
+}
+.delta-table td:first-child{text-align:left;font-weight:500;color:var(--text2)}
+.delta-table tr:last-child td{border-bottom:none}
+.delta-table tr.total-row td{
+  font-family:'Syne',sans-serif;font-weight:700;font-size:13px;
+  background:var(--card2);border-top:2px solid var(--border2);color:var(--text);
+}
+.delta-table tr.total-row td:first-child{color:var(--text)}
+.delta-col-prev{color:var(--text2)}
+.delta-col-cons{color:var(--text)}
+.delta-pos{color:var(--green);font-weight:600}   /* cons < prev = risparmio */
+.delta-neg{color:var(--red);font-weight:600}     /* cons > prev = sforamento */
+.delta-zero{color:var(--text3)}
+.delta-bar-wrap{display:flex;align-items:center;gap:6px}
+.delta-bar{height:5px;border-radius:3px;min-width:2px;transition:width .3s}
+.delta-bar.prev{background:var(--text3)}
+.delta-bar.cons{background:var(--accent)}
+
 /* ── View mode toggle ── */
 .view-toggle{
   display:flex;background:var(--card2);border:1px solid var(--border);
@@ -311,13 +364,6 @@ th.th-group-sep{border-left:2px solid var(--border2)!important}
   .btn-tab,.btn-row{display:none!important}
 }
 </style>
-<link rel="manifest" href="manifest.json"/>
-<meta name="theme-color" content="#0c1210"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Viaggi Camper"/>
-<link rel="apple-touch-icon" href="icon-192.png"/>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js")}</script>
 </head>
 <body>
 <div id="root"></div>
@@ -463,7 +509,8 @@ const getStats = (data, budget) => {
     guida:   data.reduce((a,d)=>a+(calcTempoNum(d)||0),0),
     notti:   data.filter(d=>d.idTappa||n(d.piazzola)>0).length,
     struttura: data.reduce((a,d)=>a+n(d.piazzola)+n(d.tassa)+n(d.extraStruttura),0),
-    carburante:data.reduce((a,d)=>a+n(d.benzina)+n(d.gasolio)+n(d.pedaggi),0),
+    carburante:data.reduce((a,d)=>a+n(d.benzina)+n(d.gasolio),0),
+    pedaggi:   data.reduce((a,d)=>a+n(d.pedaggi),0),
     vitto:   data.reduce((a,d)=>a+n(d.spesa)+n(d.cena)+n(d.colazione),0),
     extra:   data.reduce((a,d)=>a+n(d.extraVar),0),
     totale:  data.reduce((a,d)=>a+calcCosto(d),0),
@@ -613,6 +660,7 @@ function StatsPanel({data, budget}){
     {icon:"🌙", label:"Notti struttura", val:s.notti,            fmt:v=>`${v}`,       cls:""},
     {icon:"🏕️", label:"Strutture",       val:s.struttura,        fmt:v=>`€ ${fmt2(v)}`,cls:"accent"},
     {icon:"⛽", label:"Carburante",      val:s.carburante,       fmt:v=>`€ ${fmt2(v)}`,cls:"accent"},
+    {icon:"🛣️", label:"Pedaggi",         val:s.pedaggi,          fmt:v=>`€ ${fmt2(v)}`,cls:""},
     {icon:"🍽️", label:"Vitto",           val:s.vitto,            fmt:v=>`€ ${fmt2(v)}`,cls:"accent"},
     {icon:"📦", label:"Extra",           val:s.extra,            fmt:v=>`€ ${fmt2(v)}`,cls:""},
     {icon:"💰", label:"Totale spese",    val:s.totale,           fmt:v=>`€ ${fmt2(v)}`,cls:"primary"},
@@ -831,6 +879,175 @@ function PanoramicaView({data, budget, onOpenDetail}){
         <div className="pan-legend-item" style={{marginLeft:"auto",color:"var(--text3)",fontSize:10}}>
           · = vuoto &nbsp; tocca cella → modifica giorno
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delta View ─────────────────────────────────────────────────────────────
+const DELTA_CATS = [
+  {key:"struttura", label:"🏕️ Struttura",  keys:["piazzola","tassa","extraStruttura"]},
+  {key:"carburante",label:"⛽ Carburante",  keys:["benzina","gasolio"]},
+  {key:"pedaggi",   label:"🛣️ Pedaggi",    keys:["pedaggi"]},
+  {key:"spesa",     label:"🛒 Spesa",       keys:["spesa"]},
+  {key:"cena",      label:"🍽️ Cena",        keys:["cena"]},
+  {key:"colazione", label:"☕ Colazione",   keys:["colazione"]},
+  {key:"extra",     label:"📦 Extra",       keys:["extraVar"]},
+  {key:"km",        label:"🛣️ KM totali",  keys:["km"], isKm:true},
+];
+
+function fmtDelta(d, isKm=false){
+  if(d===0) return <span className="delta-zero">—</span>;
+  const sign = d>0 ? "+" : "−";
+  const val  = isKm ? Math.abs(d) : fmt2(Math.abs(d));
+  const cls  = isKm ? (d>0?"delta-pos":"delta-neg") : (d<0?"delta-pos":"delta-neg");
+  // for €: negative delta = cons < prev = risparmio (green); positive = sforamento (red)
+  // for km: positive = more km (neutral/info, show as plain)
+  return <span className={isKm?"":cls}>{sign}{isKm?`${val} km`:`€${val}`}</span>;
+}
+
+function DeltaView({viaggio}){
+  const prev = viaggio.preventivo || [];
+  const cons = viaggio.consuntivo || [];
+  const days = Math.max(prev.length, cons.length);
+
+  if(!days) return <div className="empty"><div className="empty-icon">📊</div><p>Nessun dato disponibile.</p></div>;
+
+  const hasPreventivo = prev.some(d=>calcCosto(d)>0);
+  const hasConsuntivo = cons.some(d=>calcCosto(d)>0);
+
+  // ── Totals by category ──
+  const catRows = DELTA_CATS.map(cat=>{
+    const vPrev = prev.reduce((a,d)=>a+cat.keys.reduce((b,k)=>b+n(d[k]),0),0);
+    const vCons = cons.reduce((a,d)=>a+cat.keys.reduce((b,k)=>b+n(d[k]),0),0);
+    const delta = vPrev - vCons; // positive = cons < prev = risparmio
+    return {...cat, vPrev, vCons, delta};
+  });
+
+  const totPrevCosto = prev.reduce((a,d)=>a+calcCosto(d),0);
+  const totConsCosto = cons.reduce((a,d)=>a+calcCosto(d),0);
+  const totPrevCassa = prev.reduce((a,_,i)=>a+calcCassa(prev,i),0);
+  const totConsCassa = cons.reduce((a,_,i)=>a+calcCassa(cons,i),0);
+  const maxCat = Math.max(1,...catRows.filter(c=>!c.isKm).map(c=>Math.max(c.vPrev,c.vCons)));
+
+  // ── Per-day comparison ──
+  const dayRows = Array.from({length:days},(_,i)=>{
+    const dp = prev[i], dc = cons[i];
+    const vPrev = dp ? calcCosto(dp) : null;
+    const vCons = dc ? calcCosto(dc) : null;
+    const delta = (vPrev!=null&&vCons!=null) ? vPrev-vCons : null;
+    const date  = dp?.date || dc?.date || "";
+    const dow   = date ? DAYS_OF_WEEK[new Date(date+"T12:00:00").getDay()] : "";
+    return {i, date, dow, vPrev, vCons, delta};
+  });
+  const maxDay = Math.max(1,...dayRows.map(r=>Math.max(r.vPrev??0,r.vCons??0)));
+
+  return (
+    <div className="delta-wrap">
+
+      {(!hasPreventivo||!hasConsuntivo) && (
+        <div style={{background:"var(--accent-faint)",border:"1px solid rgba(240,160,69,.2)",borderRadius:10,padding:"10px 14px",fontSize:12,color:"var(--accent)"}}>
+          ⚠️ {!hasPreventivo?"Il preventivo è vuoto.":""} {!hasConsuntivo?"Il consuntivo è vuoto — inserisci i dati reali per vedere le differenze.":""}
+        </div>
+      )}
+
+      {/* ── Riepilogo per categoria ── */}
+      <div className="section-title">Riepilogo per categoria</div>
+      <div style={{overflow:"auto",borderRadius:12,border:"1px solid var(--border)"}}>
+        <table className="delta-table" style={{borderRadius:0,border:"none"}}>
+          <thead>
+            <tr>
+              <th>Categoria</th>
+              <th>Preventivo</th>
+              <th>Consuntivo</th>
+              <th>Δ Differenza</th>
+              <th style={{minWidth:100}}>Barre</th>
+            </tr>
+          </thead>
+          <tbody>
+            {catRows.map(r=>(
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td className="delta-col-prev">
+                  {r.vPrev===0?"—":r.isKm?`${r.vPrev} km`:`€${fmt2(r.vPrev)}`}
+                </td>
+                <td className="delta-col-cons">
+                  {r.vCons===0?"—":r.isKm?`${r.vCons} km`:`€${fmt2(r.vCons)}`}
+                </td>
+                <td>{fmtDelta(r.delta, r.isKm)}</td>
+                <td>
+                  {!r.isKm && (r.vPrev>0||r.vCons>0) && (
+                    <div style={{display:"flex",flexDirection:"column",gap:2,paddingRight:4}}>
+                      <div className="delta-bar prev" style={{width:Math.round(r.vPrev/maxCat*90)+"px"}}/>
+                      <div className="delta-bar cons" style={{width:Math.round(r.vCons/maxCat*90)+"px"}}/>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="total-row">
+              <td>💰 Totale costo</td>
+              <td>€{fmt2(totPrevCosto)}</td>
+              <td>€{fmt2(totConsCosto)}</td>
+              <td>{fmtDelta(totPrevCosto-totConsCosto)}</td>
+              <td/>
+            </tr>
+            <tr className="total-row">
+              <td>💳 Totale cassa</td>
+              <td>€{fmt2(totPrevCassa)}</td>
+              <td>€{fmt2(totConsCassa)}</td>
+              <td>{fmtDelta(totPrevCassa-totConsCassa)}</td>
+              <td/>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* ── Giorno per giorno ── */}
+      <div className="section-title">Costo giorno per giorno</div>
+      <div style={{overflow:"auto",borderRadius:12,border:"1px solid var(--border)"}}>
+        <table className="delta-table" style={{borderRadius:0,border:"none"}}>
+          <thead>
+            <tr>
+              <th style={{minWidth:110}}>Giorno</th>
+              <th>Preventivo</th>
+              <th>Consuntivo</th>
+              <th>Δ Differenza</th>
+              <th style={{minWidth:100}}>Barre</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dayRows.map(r=>(
+              <tr key={r.i}>
+                <td>
+                  <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,color:"var(--primary)",marginRight:6}}>G{r.i+1}</span>
+                  <span style={{color:"var(--text3)",fontSize:11}}>{r.dow} {fmtShort(r.date)}</span>
+                </td>
+                <td className="delta-col-prev">{r.vPrev==null||r.vPrev===0?"—":`€${fmt2(r.vPrev)}`}</td>
+                <td className="delta-col-cons">{r.vCons==null||r.vCons===0?"—":`€${fmt2(r.vCons)}`}</td>
+                <td>{r.delta!=null&&(r.vPrev>0||r.vCons>0)?fmtDelta(r.delta):<span className="delta-zero">—</span>}</td>
+                <td>
+                  {(r.vPrev>0||r.vCons>0) && (
+                    <div style={{display:"flex",flexDirection:"column",gap:2,paddingRight:4}}>
+                      <div className="delta-bar prev" style={{width:Math.round((r.vPrev??0)/maxDay*90)+"px"}}/>
+                      <div className="delta-bar cons" style={{width:Math.round((r.vCons??0)/maxDay*90)+"px"}}/>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="pan-legend">
+        <div className="pan-legend-item"><div className="pan-legend-dot" style={{background:"var(--text3)"}}/>Preventivo</div>
+        <div className="pan-legend-item"><div className="pan-legend-dot" style={{background:"var(--accent)"}}/>Consuntivo</div>
+        <div className="pan-legend-item"><span className="delta-pos">▲ verde</span>&nbsp;= risparmio rispetto al preventivo</div>
+        <div className="pan-legend-item"><span className="delta-neg">▼ rosso</span>&nbsp;= sforamento</div>
       </div>
     </div>
   );
@@ -1078,13 +1295,106 @@ function DayModal({dayIndex, data, budget, onClose, onChange}){
   );
 }
 
+// ── Tappa Chain ────────────────────────────────────────────────────────────
+function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget}){
+  const totalAllocato = tappe.reduce((a,t)=>a+n(t.budgetAllocato),0);
+  const nonAllocato   = budget - totalAllocato;
+
+  // Build chain: compute riporto progressively
+  let riporto = 0;
+  const chain = tappe.map((t, ti) => {
+    const allocato    = n(t.budgetAllocato);
+    const prevRiporto = riporto;
+    const disponibile = allocato + prevRiporto;
+    const tappaGiorni = data.filter(d => d.idTappa === t.idTappa);
+    const spesoTappa  = tappaGiorni.reduce((a, d) => a + calcCassa(data, data.indexOf(d)), 0);
+    const residuo     = disponibile - spesoTappa;
+    riporto = residuo;
+    return { t, ti, allocato, prevRiporto, disponibile, spesoTappa, residuo };
+  });
+
+  return (
+    <div style={{marginBottom:16}}>
+      <div className="section-title">Tappe {tab}</div>
+      <div className="tappa-chain">
+        {chain.map(({t, ti, allocato, prevRiporto, disponibile, spesoTappa, residuo}) => {
+          const hasAllocato = allocato > 0;
+          return (
+            <div key={t.id}>
+              {ti > 0 && prevRiporto !== 0 && (
+                <div className="tappa-riporto">
+                  ↓ riporto {prevRiporto >= 0 ? "+" : ""}{fmt2(prevRiporto)} € dalla tappa precedente
+                </div>
+              )}
+              <div className="tappa-item">
+                <div className="tappa-item-head">
+                  <div className="tappa-info">
+                    <div className="tappa-name">
+                      <span className="badge">{t.idTappa}</span>&nbsp;
+                      {t.luogo} — <span style={{color:"var(--text2)"}}>{t.struttura}</span>
+                    </div>
+                    <div className="tappa-meta">
+                      {fmtDate(t.startDate)} → {fmtDate(t.endDate)} &nbsp;·&nbsp;
+                      {Math.max(0, diffInclusive(t.startDate, t.endDate)-1)} notti
+                    </div>
+                  </div>
+                  <button className="btn-icon btn-sm" style={{color:"var(--red)"}} onClick={()=>onDelete(t)}>✕</button>
+                </div>
+                <div className="tappa-budget-bar">
+                  <div className="tappa-budget-cell">
+                    <span className="tbc-label">Allocato</span>
+                    <input className="tappa-budget-input" type="number"
+                      value={allocato === 0 ? "" : allocato} placeholder="—"
+                      onFocus={e=>e.target.select()}
+                      onChange={e=>onUpdateBudget(t.id, e.target.value===""?0:+e.target.value)}/>
+                  </div>
+                  <div className="tappa-budget-cell">
+                    <span className="tbc-label">Disponibile</span>
+                    {hasAllocato || prevRiporto !== 0
+                      ? <span className="tbc-val primary">€{fmt2(disponibile)}</span>
+                      : <span className="tbc-val muted">—</span>}
+                  </div>
+                  <div className="tappa-budget-cell">
+                    <span className="tbc-label">Speso</span>
+                    <span className={`tbc-val${spesoTappa > 0 ? " accent" : ""}`}>
+                      {spesoTappa > 0 ? `€${fmt2(spesoTappa)}` : "—"}
+                    </span>
+                  </div>
+                  <div className="tappa-budget-cell">
+                    <span className="tbc-label">Residuo</span>
+                    {(hasAllocato || prevRiporto !== 0) && spesoTappa > 0
+                      ? <span className={`tbc-val ${residuo >= 0 ? "pos" : "neg"}`}>€{fmt2(residuo)}</span>
+                      : spesoTappa > 0 && !hasAllocato
+                        ? <span className="tbc-val muted">nessun budget</span>
+                        : <span className="tbc-val muted">—</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {totalAllocato > 0 && (
+        <div className="budget-unallocated">
+          <span style={{color:"var(--accent)",fontWeight:600}}>🎯 Buffer non allocato</span>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:15,
+            color:nonAllocato>=0?"var(--accent)":"var(--red)"}}>
+            €{fmt2(nonAllocato)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tappa Modal ────────────────────────────────────────────────────────────
 function TappaModal({viaggio, onClose, onSave}){
   const [f,setF] = React.useState({
     startDate:viaggio.startDate, endDate:addDays(viaggio.startDate,1),
     luogo:"", struttura:"",
     costoPiazzola:0, costoPersona:0, numeroPersone:2,
-    elettricita:0, moto:0, tassaSoggiorno:0, extraStruttura:0
+    elettricita:0, moto:0, tassaSoggiorno:0, extraStruttura:0,
+    budgetAllocato:0
   });
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const notti = Math.max(0, diffInclusive(f.startDate, f.endDate)-1);
@@ -1118,6 +1428,7 @@ function TappaModal({viaggio, onClose, onSave}){
         <NumField label="Moto €/notte"                  value={f.moto}             onChange={v=>u("moto",v)}/>
         <NumField label="Tassa soggiorno €/persona/notte" value={f.tassaSoggiorno} onChange={v=>u("tassaSoggiorno",v)}/>
         <NumField label="Extra struttura €/notte"       value={f.extraStruttura}   onChange={v=>u("extraStruttura",v)}/>
+        <NumField label="Budget allocato € (opzionale)" value={f.budgetAllocato}   onChange={v=>u("budgetAllocato",v)} placeholder="0 = non definito"/>
       </div>
       <div className="tappa-summary">
         <div><span>Notti</span><strong className="primary">{notti}</strong></div>
@@ -1219,6 +1530,11 @@ function TripView({viaggio, updateTrip, back}){
     updateTrip(copy);
   };
 
+  const updateTappaBudget = (tappaId, val) => {
+    const copy = {...viaggio, tappe:(viaggio.tappe||[]).map(t=>t.id===tappaId?{...t,budgetAllocato:val}:t)};
+    updateTrip(copy);
+  };
+
   const editTrip = form => {
     const newPreventivo = buildDays(form.startDate, form.endDate, viaggio.preventivo);
     const newConsuntivo = buildDays(form.startDate, form.endDate, viaggio.consuntivo);
@@ -1248,26 +1564,14 @@ function TripView({viaggio, updateTrip, back}){
       </div>
 
       <div className="container">
-        {/* Tappe */}
+        {/* Tappe budget chain */}
         {tappe.length>0 && (
-          <div style={{marginBottom:16}}>
-            <div className="section-title">Tappe {tab}</div>
-            {tappe.map(t=>(
-              <div key={t.id} className="tappa-item">
-                <div className="tappa-info">
-                  <div className="tappa-name">
-                    <span className="badge">{t.idTappa}</span>&nbsp;
-                    {t.luogo} — <span style={{color:"var(--text2)"}}>{t.struttura}</span>
-                  </div>
-                  <div className="tappa-meta">
-                    {fmtDate(t.startDate)} → {fmtDate(t.endDate)} &nbsp;·&nbsp; {Math.max(0,diffInclusive(t.startDate,t.endDate)-1)} notti &nbsp;·&nbsp;
-                    checkout: {fmtDate(t.endDate)}
-                  </div>
-                </div>
-                <button className="btn-icon btn-sm" style={{color:"var(--red)"}} onClick={()=>setDelTappa(t)} title="Elimina tappa">✕</button>
-              </div>
-            ))}
-          </div>
+          <TappaChain
+            tappe={tappe} data={data} tab={tab}
+            budget={n(viaggio.budget)}
+            onDelete={t=>setDelTappa(t)}
+            onUpdateBudget={updateTappaBudget}
+          />
         )}
 
         {/* Stats toggle */}
@@ -1282,11 +1586,13 @@ function TripView({viaggio, updateTrip, back}){
         {/* View toggle + section header */}
         <div style={{display:"flex",alignItems:"center",gap:10,marginTop:16,marginBottom:8,flexWrap:"wrap"}}>
           <div className="section-title" style={{margin:0,flex:1,minWidth:120}}>
-            {viewMode==="panoramica"?"Panoramica":"Tabella dettaglio"} — {tab}
+            {viewMode==="panoramica"?"Panoramica":viewMode==="delta"?"Preventivo vs Consuntivo":"Tabella dettaglio"}
+            {viewMode!=="delta" && <span style={{color:"var(--text3)",fontWeight:400}}> — {tab}</span>}
           </div>
           <div className="view-toggle no-print">
             <button className={viewMode==="panoramica"?"active":""} onClick={()=>setViewMode("panoramica")}>📅 Panoramica</button>
             <button className={viewMode==="tabella"?"active":""} onClick={()=>setViewMode("tabella")}>📊 Tabella</button>
+            <button className={viewMode==="delta"?"active":""} onClick={()=>setViewMode("delta")}>Δ Delta</button>
           </div>
           {viewMode==="tabella" && (
             <button className="btn btn-sm no-print" onClick={()=>setFsGrid(true)}
@@ -1304,6 +1610,9 @@ function TripView({viaggio, updateTrip, back}){
             <p style={{fontSize:11,color:"var(--text3)",margin:"0 0 6px"}}>* Pag. manuale: lascia vuoto per calcolo automatico al checkout della tappa.</p>
             <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} onDayClick={i=>setDayModal(i)}/>
           </>
+        )}
+        {viewMode==="delta" && (
+          <DeltaView viaggio={viaggio}/>
         )}
       </div>
 
@@ -1338,7 +1647,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v4.9</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v5.4</span></div>
         <div className="header-actions">
           <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
         </div>
