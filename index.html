@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v5.4</title>
+<title>🚐 Viaggi Camper v5.6</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -900,7 +900,7 @@ function fmtDelta(d, isKm=false){
   if(d===0) return <span className="delta-zero">—</span>;
   const sign = d>0 ? "+" : "−";
   const val  = isKm ? Math.abs(d) : fmt2(Math.abs(d));
-  const cls  = isKm ? (d>0?"delta-pos":"delta-neg") : (d<0?"delta-pos":"delta-neg");
+  const cls  = isKm ? "" : (d>0?"delta-pos":"delta-neg");
   // for €: negative delta = cons < prev = risparmio (green); positive = sforamento (red)
   // for km: positive = more km (neutral/info, show as plain)
   return <span className={isKm?"":cls}>{sign}{isKm?`${val} km`:`€${val}`}</span>;
@@ -1550,7 +1550,11 @@ function TripView({viaggio, updateTrip, back}){
           <button className="btn-icon" onClick={back} title="Torna alla lista">←</button>
           <div>
             <div className="logo" style={{fontSize:15}}>{viaggio.nome}</div>
-            <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>{fmtDate(viaggio.startDate)} → {fmtDate(viaggio.endDate)} · {data.length} giorni</div>
+            <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>
+              {fmtDate(viaggio.startDate)} → {fmtDate(viaggio.endDate)} · {data.length} giorni
+              &nbsp;·&nbsp;
+              <span style={{color:"var(--primary)",fontWeight:600}}>Budget € {fmt2(n(viaggio.budget))}</span>
+            </div>
           </div>
         </div>
         <div className="header-actions">
@@ -1647,7 +1651,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v5.4</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v5.6</span></div>
         <div className="header-actions">
           <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
         </div>
