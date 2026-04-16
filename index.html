@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v5.6</title>
+<title>🚐 Viaggi Camper v5.7</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -489,15 +489,18 @@ const calcPagamento = (days,idx) => {
   const d=days[idx]; if(!d) return 0;
   if(!d.idTappa) return n(d.pagamentoManual);
   const prev=days[idx-1];
-  const isChk = prev && prev.idTappa===d.idTappa && n(d.piazzola)===0 && n(d.tassa)===0 && n(d.extraStruttura)===0;
+  // Checkout = stesso idTappa del giorno prima, ma piazzola e tassa azzerate
+  const isChk = prev && prev.idTappa===d.idTappa && n(d.piazzola)===0 && n(d.tassa)===0;
   if(isChk){
-    const sum=days.reduce((a,x)=>x.idTappa===d.idTappa?a+n(x.piazzola)+n(x.tassa)+n(x.extraStruttura):a,0);
+    // Somma SOLO piazzola+tassa (gli extra si pagano giorno per giorno)
+    const sum=days.reduce((a,x)=>x.idTappa===d.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
     return n(d.pagamentoManual!==""?d.pagamentoManual:sum);
   }
   return n(d.pagamentoManual);
 };
 const calcCosto = d => ["piazzola","tassa","extraStruttura","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0);
-const calcCassa = (days,idx) => { const d=days[idx]; return calcPagamento(days,idx)+["benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0); };
+// extraStruttura pagata ogni giorno, piazzola+tassa al checkout tramite calcPagamento
+const calcCassa = (days,idx) => { const d=days[idx]; return calcPagamento(days,idx)+["extraStruttura","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0); };
 const calcBudgetSeries = (days,budget) => { let c=n(budget); return days.map((_,i)=>{c-=calcCassa(days,i);return c;}); };
 const calcTempoNum = d => n(d.velocita)>0 ? n(d.km)/n(d.velocita) : null;
 
@@ -1651,7 +1654,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v5.6</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v5.7</span></div>
         <div className="header-actions">
           <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
         </div>
