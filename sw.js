@@ -1,4 +1,4 @@
-const CACHE = "camper-v5.7";
+const CACHE = "camper-v6.0";
 const ASSETS = [".", "index.html", "manifest.json"];
 
 self.addEventListener("install", e => {

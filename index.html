@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v5.7</title>
+<title>🚐 Viaggi Camper v6.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1488,7 +1488,7 @@ function TripFormModal({initial, title, onClose, onSave}){
 }
 
 // ── Trip View ──────────────────────────────────────────────────────────────
-function TripView({viaggio, updateTrip, back}){
+function TripView({viaggio, updateTrip, back, user, onShare}){
   useBack(back);
   const [tab, setTab]           = React.useState("preventivo");
   const [showTappa, setTappa]   = React.useState(false);
@@ -1566,6 +1566,7 @@ function TripView({viaggio, updateTrip, back}){
           <button className="btn-icon no-print" onClick={()=>setTappa(true)} title="Aggiungi tappa">＋ Tappa</button>
           <button className="btn-icon no-print" onClick={()=>exportCSV(viaggio,tab)} title="Esporta CSV">CSV</button>
           <button className="btn-icon no-print" onClick={()=>window.print()} title="Stampa">🖨</button>
+          {onShare && <button className="btn-icon no-print" onClick={onShare} title="Condividi viaggio">👥</button>}
           <button className="btn-icon no-print" onClick={()=>setEdit(true)} title="Modifica viaggio">✏️</button>
         </div>
       </div>
@@ -1632,49 +1633,285 @@ function TripView({viaggio, updateTrip, back}){
   );
 }
 
+// ── Firebase error → Italian ─────────────────────────────────────────────
+const FB_ERR = {
+  'auth/user-not-found':'Email non trovata',
+  'auth/wrong-password':'Password errata',
+  'auth/email-already-in-use':'Email già registrata',
+  'auth/weak-password':'Password troppo corta (min. 6 caratteri)',
+  'auth/invalid-email':'Email non valida',
+  'auth/invalid-credential':'Email o password errati',
+  'auth/too-many-requests':'Troppi tentativi, riprova tra qualche minuto',
+  'auth/popup-closed-by-user':'Accesso Google annullato',
+};
+function fbErr(e){ const code=e?.code||''; return FB_ERR[code]||e?.message||'Errore sconosciuto'; }
+
+// ── Login Screen ─────────────────────────────────────────────────────────
+function LoginScreen(){
+  const [mode,setMode]   = React.useState("login");
+  const [email,setEmail] = React.useState("");
+  const [pass,setPass]   = React.useState("");
+  const [err,setErr]     = React.useState("");
+  const [load,setLoad]   = React.useState(false);
+
+  const handle = async () => {
+    if(!email.trim()||!pass.trim()){ setErr("Compila email e password"); return; }
+    setErr(""); setLoad(true);
+    try {
+      if(mode==="login"){
+        await firebase.auth().signInWithEmailAndPassword(email.trim(), pass);
+      } else {
+        await firebase.auth().createUserWithEmailAndPassword(email.trim(), pass);
+      }
+    } catch(e){ setErr(fbErr(e)); }
+    setLoad(false);
+  };
+
+  const googleLogin = async () => {
+    setErr(""); setLoad(true);
+    try {
+      await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    } catch(e){ setErr(fbErr(e)); }
+    setLoad(false);
+  };
+
+  return (
+    <div className="login-screen">
+      <div className="login-card">
+        <div className="login-logo">🚐</div>
+        <h1 className="login-title">Viaggi Camper</h1>
+        <p className="login-sub">v6.0 — sincronizzato nel cloud</p>
+
+        <button className="btn-google" onClick={googleLogin} disabled={load}>
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Accedi con Google
+        </button>
+
+        <div className="login-divider"><span>oppure</span></div>
+
+        <div className="field">
+          <label className="field-label">Email</label>
+          <input type="email" className="field-input" value={email}
+            onChange={e=>setEmail(e.target.value)} placeholder="tua@email.com"
+            onKeyDown={e=>e.key==="Enter"&&handle()}/>
+        </div>
+        <div className="field" style={{marginTop:10}}>
+          <label className="field-label">Password</label>
+          <input type="password" className="field-input" value={pass}
+            onChange={e=>setPass(e.target.value)} placeholder="••••••••"
+            onKeyDown={e=>e.key==="Enter"&&handle()}/>
+        </div>
+
+        {err && <div className="login-err">{err}</div>}
+
+        <button className="btn-primary" style={{width:"100%",marginTop:14,padding:"12px"}}
+          onClick={handle} disabled={load}>
+          {load ? "⏳ Attendere..." : mode==="login" ? "Accedi" : "Registrati"}
+        </button>
+
+        <p className="login-switch">
+          {mode==="login" ? "Non hai un account? " : "Hai già un account? "}
+          <button onClick={()=>{setMode(m=>m==="login"?"register":"login");setErr("");}}>
+            {mode==="login"?"Registrati":"Accedi"}
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Share Modal ───────────────────────────────────────────────────────────
+function ShareModal({viaggio, user, onClose}){
+  const [email,setEmail] = React.useState("");
+  const [status,setStatus] = React.useState(""); // ""|"loading"|"ok"|"err"
+  const [msg,setMsg]     = React.useState("");
+  const memberEmails     = viaggio.memberEmails || [user.email];
+  const members          = viaggio.members || [user.uid];
+  const isOwner          = viaggio.ownerId === user.uid;
+
+  const addUser = async () => {
+    const em = email.trim().toLowerCase();
+    if(!em){ setErr("Inserisci un'email"); return; }
+    if(memberEmails.includes(em)){ setStatus("err"); setMsg("Utente già presente"); return; }
+    setStatus("loading"); setMsg("");
+    try {
+      const snap = await firebase.firestore().collection('users')
+        .where('email','==',em).limit(1).get();
+      if(snap.empty){ setStatus("err"); setMsg("Utente non trovato — deve prima registrarsi nell'app"); return; }
+      const uid = snap.docs[0].id;
+      await firebase.firestore().collection('viaggi').doc(viaggio.id).update({
+        members:      firebase.firestore.FieldValue.arrayUnion(uid),
+        memberEmails: firebase.firestore.FieldValue.arrayUnion(em),
+      });
+      setStatus("ok"); setMsg(`✓ ${em} aggiunto!`); setEmail("");
+    } catch(e){ setStatus("err"); setMsg(fbErr(e)); }
+  };
+
+  const removeUser = async (uid, em) => {
+    await firebase.firestore().collection('viaggi').doc(viaggio.id).update({
+      members:      firebase.firestore.FieldValue.arrayRemove(uid),
+      memberEmails: firebase.firestore.FieldValue.arrayRemove(em),
+    });
+  };
+
+  return (
+    <Modal title={`👥 Condividi — ${viaggio.nome}`} onClose={onClose} width="460px">
+      <div className="section-title" style={{marginBottom:8}}>Partecipanti</div>
+      {memberEmails.map((em,i)=>(
+        <div key={em} className="share-member">
+          <span style={{flex:1,fontSize:13,color:"var(--text)"}}>{em}</span>
+          {em===user.email && <span className="badge">tu</span>}
+          {i===0 && <span className="badge accent">owner</span>}
+          {isOwner && em!==user.email && (
+            <button className="btn-icon btn-sm" style={{color:"var(--red)"}}
+              onClick={()=>removeUser(members[i],em)}>✕</button>
+          )}
+        </div>
+      ))}
+
+      <div className="section-title" style={{marginTop:20,marginBottom:8}}>Aggiungi persona</div>
+      <p style={{fontSize:12,color:"var(--text2)",marginBottom:10}}>
+        L'altra persona deve prima registrarsi nell'app con la stessa email.
+      </p>
+      <div style={{display:"flex",gap:8}}>
+        <input type="email" className="field-input" value={email}
+          onChange={e=>setEmail(e.target.value)} placeholder="email@esempio.com"
+          onKeyDown={e=>e.key==="Enter"&&addUser()} style={{flex:1}}/>
+        <button className="btn-primary" onClick={addUser} disabled={status==="loading"}>
+          {status==="loading"?"...":"+ Aggiungi"}
+        </button>
+      </div>
+      {msg && <p style={{fontSize:12,marginTop:8,
+        color:status==="ok"?"var(--green)":"var(--red)"}}>{msg}</p>}
+      <div className="btn-row"><button className="btn" onClick={onClose}>Chiudi</button></div>
+    </Modal>
+  );
+}
+
 // ── Home View ──────────────────────────────────────────────────────────────
 function App(){
-  const [viaggi,setViaggi] = React.useState(()=>{
-    try{ return JSON.parse(localStorage.getItem(SK)||"[]"); }catch{ return []; }
-  });
+  const [user,setUser]       = React.useState(undefined); // undefined=loading
+  const [viaggi,setViaggi]   = React.useState([]);
   const [activeId,setActiveId] = React.useState(null);
-  const [showNew,setNew]       = React.useState(false);
-  const [delId,setDel]         = React.useState(null);
+  const [showNew,setNew]     = React.useState(false);
+  const [delId,setDel]       = React.useState(null);
+  const [showShare,setShare] = React.useState(null); // viaggio object
 
-  React.useEffect(()=>{ localStorage.setItem(SK,JSON.stringify(viaggi)); },[viaggi]);
+  // Auth listener
+  React.useEffect(()=>{
+    return firebase.auth().onAuthStateChanged(u=>setUser(u||null));
+  },[]);
 
-  const updateTrip = t => setViaggi(p=>p.map(v=>v.id===t.id?t:v));
+  // Firestore listener — subscribe when user logs in
+  React.useEffect(()=>{
+    if(user===undefined) return;
+    if(!user){ setViaggi([]); return; }
+    // Save/update user profile for lookup by others
+    firebase.firestore().collection('users').doc(user.uid)
+      .set({email:user.email.toLowerCase(), displayName:user.displayName||user.email},{merge:true});
+    // Subscribe to all trips where user is a member
+    const unsub = firebase.firestore().collection('viaggi')
+      .where('members','array-contains',user.uid)
+      .onSnapshot(snap=>{
+        const list = snap.docs.map(d=>({...d.data(), id:d.id}));
+        list.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+        setViaggi(list);
+      }, err=>console.error('Firestore err:',err));
+    return unsub;
+  },[user]);
 
+  const updateTrip = t => {
+    const {id,...data} = t;
+    firebase.firestore().collection('viaggi').doc(id).update(data)
+      .catch(e=>console.error('updateTrip:',e));
+  };
+
+  const addTrip = form => {
+    const trip = createTrip(form);
+    const {id:_,...data} = trip;
+    firebase.firestore().collection('viaggi').add({
+      ...data,
+      ownerId:      user.uid,
+      members:      [user.uid],
+      memberEmails: [user.email.toLowerCase()],
+      createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
+    }).catch(e=>console.error('addTrip:',e));
+  };
+
+  const removeTrip = id => {
+    firebase.firestore().collection('viaggi').doc(id).delete()
+      .catch(e=>console.error('removeTrip:',e));
+  };
+
+  const signOut = () => firebase.auth().signOut();
+
+  // ── Loading ──
+  if(user===undefined) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",
+      height:"100vh",flexDirection:"column",gap:14,background:"var(--bg)"}}>
+      <div style={{fontSize:40}}>🚐</div>
+      <div style={{color:"var(--text2)",fontSize:13}}>Caricamento...</div>
+    </div>
+  );
+
+  // ── Not logged in ──
+  if(!user) return <LoginScreen/>;
+
+  // ── Trip view ──
   if(activeId){
     const v = viaggi.find(x=>x.id===activeId);
     if(!v){ setActiveId(null); return null; }
-    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)}/>;
+    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)}
+                     user={user} onShare={()=>setShare(v)}/>;
   }
 
+  // ── Home ──
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v5.7</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.0</span></div>
         <div className="header-actions">
+          <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
+            textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
+            {user.email}
+          </span>
           <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
+          <button className="btn-icon" onClick={signOut} title="Esci dall'account" style={{fontSize:16}}>⏻</button>
         </div>
       </div>
+
       <div className="container">
+        {/* User email strip */}
+        <div style={{fontSize:11,color:"var(--text3)",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+          <span>👤</span>
+          <span>{user.email}</span>
+        </div>
+
         {viaggi.length===0 && (
-          <div className="empty" style={{paddingTop:80}}>
+          <div className="empty" style={{paddingTop:60}}>
             <div className="empty-icon">🚐</div>
             <p style={{marginBottom:16,color:"var(--text2)"}}>Nessun viaggio ancora. Crea il tuo primo!</p>
             <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
           </div>
         )}
+
         <div className="trips-grid">
           {viaggi.map(v=>{
-            const giorni = diffInclusive(v.startDate,v.endDate);
-            const stats  = getStats(v.consuntivo||[], v.budget);
-            const hasData= (v.consuntivo||[]).some(d=>calcCosto(d)>0);
+            const giorni  = diffInclusive(v.startDate,v.endDate);
+            const stats   = getStats(v.consuntivo||[], v.budget);
+            const hasData = (v.consuntivo||[]).some(d=>calcCosto(d)>0);
+            const isShared = (v.members||[]).length > 1;
             return (
               <div key={v.id} className="trip-card" onClick={()=>setActiveId(v.id)}>
-                <div className="trip-card-name">{v.nome}</div>
+                <div className="trip-card-name">
+                  {v.nome}
+                  {isShared && <span className="badge accent" style={{fontSize:10,marginLeft:6}}>👥</span>}
+                </div>
                 <div className="trip-card-meta">
                   <span>📅 {fmtDate(v.startDate)} → {fmtDate(v.endDate)}</span>
                   <span>⏱ {giorni} giorni · {(v.tappe||[]).length} tappe</span>
@@ -1682,35 +1919,45 @@ function App(){
                 <div className="trip-card-budget">
                   <strong>{fmt2(n(v.budget))}</strong>
                   <span style={{fontSize:12,color:"var(--text2)"}}>budget iniziale</span>
-                  {hasData && <span style={{fontSize:12,color:stats.residuo>=0?"var(--green)":"var(--red)",marginLeft:"auto"}}>residuo: €{fmt2(stats.residuo)}</span>}
+                  {hasData && <span style={{fontSize:12,color:stats.residuo>=0?"var(--green)":"var(--red)",marginLeft:"auto"}}>
+                    residuo: €{fmt2(stats.residuo)}
+                  </span>}
                 </div>
                 <div className="trip-card-actions" onClick={e=>e.stopPropagation()}>
-                  <button className="btn-icon btn-sm" onClick={()=>setActiveId(v.id)} title="Apri">✏️ Apri</button>
-                  <button className="btn-icon btn-sm" style={{color:"var(--red)"}} onClick={()=>setDel(v.id)} title="Elimina">🗑</button>
+                  <button className="btn-icon btn-sm" onClick={()=>setActiveId(v.id)}>✏️ Apri</button>
+                  <button className="btn-icon btn-sm" style={{color:"var(--primary)"}}
+                    onClick={()=>setShare(v)} title="Condividi">👥</button>
+                  {v.ownerId===user.uid && (
+                    <button className="btn-icon btn-sm" style={{color:"var(--red)"}}
+                      onClick={()=>setDel(v.id)}>🗑</button>
+                  )}
                 </div>
               </div>
             );
           })}
           <div className="trip-card new-card" onClick={()=>setNew(true)} role="button">
-            <span style={{fontSize:24}}>＋</span>
-            <span>Nuovo viaggio</span>
+            <span style={{fontSize:24}}>＋</span><span>Nuovo viaggio</span>
           </div>
         </div>
       </div>
 
       {showNew && (
         <TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)}
-          onSave={f=>{ setViaggi(p=>[...p,createTrip(f)]); }}/>
+          onSave={f=>{ addTrip(f); setNew(false); }}/>
       )}
       {delId && (
         <Confirm
           msg={`Eliminare il viaggio "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`}
-          onOk={()=>setViaggi(p=>p.filter(v=>v.id!==delId))}
+          onOk={()=>{ removeTrip(delId); setDel(null); }}
           onClose={()=>setDel(null)}/>
+      )}
+      {showShare && (
+        <ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>
       )}
     </div>
   );
 }
+
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
