@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🚐 Viaggi Camper v4.9</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{
+  --bg:#0c1210; --bg2:#101a16; --card:#16201c; --card2:#1c2a24;
+  --border:#243028; --border2:#2e3e36;
+  --primary:#4fd8b4; --primary-dim:#2a9e80; --primary-faint:rgba(79,216,180,0.08);
+  --accent:#f0a045; --accent-faint:rgba(240,160,69,0.10);
+  --red:#f06060; --red-faint:rgba(240,96,96,0.10);
+  --green:#52d68a;
+  --text:#d8eee4; --text2:#8aaa96; --text3:#4a6a58;
+  --col-s0:#18281e; --col-s1:#1c2e24; /* struttura */
+  --col-v0:#18222a; --col-v1:#1c2832; /* viaggio */
+  --col-c0:#26201a; --col-c1:#2c261e; /* cibo */
+  --col-p0:#2a1c1a; --col-p1:#301e1c; /* pagamento */
+  --col-b0:#1e2820; --col-b1:#223020; /* budget/calc */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Noto Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+h1,h2,h3,.syne{font-family:'Syne',sans-serif}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── Layout ── */
+.app-header{background:var(--card);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30;gap:12px}
+.app-header .logo{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--primary);letter-spacing:.5px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.app-header .logo span{opacity:.5;font-weight:400}
+.header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.container{padding:20px;max-width:1600px;margin:0 auto}
+
+/* ── Buttons ── */
+button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;transition:opacity .15s,transform .1s;font-size:13px;font-weight:500}
+button:active{transform:scale(.97)}
+.btn{background:var(--card2);color:var(--text);padding:8px 14px;border:1px solid var(--border2)}
+.btn:hover{border-color:var(--primary-dim);color:var(--primary)}
+.btn-primary{background:var(--primary-dim);color:#fff;padding:8px 16px;font-weight:600}
+.btn-primary:hover{opacity:.85}
+.btn-accent{background:var(--accent);color:#0c1210;padding:8px 14px;font-weight:600}
+.btn-accent:hover{opacity:.85}
+.btn-danger{background:var(--red-faint);color:var(--red);padding:8px 14px;border:1px solid rgba(240,96,96,.2)}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-icon{background:var(--card2);color:var(--text2);padding:7px 10px;border:1px solid var(--border);font-size:15px}
+.btn-icon:hover{color:var(--primary);border-color:var(--primary-dim)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-tab{background:transparent;color:var(--text2);padding:8px 16px;border-radius:8px;border:1px solid transparent}
+.btn-tab.active{background:var(--primary-faint);color:var(--primary);border-color:var(--primary-dim)}
+.btn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+.card-sm{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px}
+
+/* ── Trip cards (home) ── */
+.trips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px}
+.trip-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 18px 14px;cursor:pointer;transition:border-color .2s,transform .15s;position:relative;overflow:hidden}
+.trip-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary-dim),var(--accent))}
+.trip-card:hover{border-color:var(--primary-dim);transform:translateY(-2px)}
+.trip-card-name{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:6px;color:var(--text)}
+.trip-card-meta{color:var(--text2);font-size:12px;display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.trip-card-budget{font-size:13px;display:flex;align-items:baseline;gap:6px}
+.trip-card-budget strong{font-family:'Syne',sans-serif;font-size:18px;color:var(--primary)}
+.trip-card-actions{display:flex;gap:6px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:10px;margin-top:4px}
+.new-card{border:2px dashed var(--border2);display:flex;align-items:center;justify-content:center;gap:10px;font-family:'Syne',sans-serif;font-weight:600;color:var(--text3);transition:all .2s;min-height:130px}
+.new-card:hover{border-color:var(--primary-dim);color:var(--primary);background:var(--primary-faint)}
+
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:600px){.modal-bg{align-items:center}}
+.modal-box{background:var(--card);border:1px solid var(--border2);border-radius:18px 18px 0 0;width:100%;max-height:90vh;overflow:auto;animation:slideUp .2s ease}
+@media(min-width:600px){.modal-box{border-radius:18px;animation:fadeIn .18s ease}}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 14px;border-bottom:1px solid var(--border)}
+.modal-header h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+.modal-body{padding:20px}
+.close-btn{background:var(--card2);border:none;color:var(--text2);width:32px;height:32px;border-radius:8px;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.close-btn:hover{color:var(--text)}
+
+/* ── Forms ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label,.field-label{font-size:12px;color:var(--text2);font-weight:500}
+.field input,.field-input{background:var(--bg2);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;width:100%}
+.field input:focus,.field-input:focus{outline:none;border-color:var(--primary-dim)}
+.field input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5)}
+
+/* ── Stats panel ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}
+.stat-card{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.stat-icon{font-size:18px;line-height:1}
+.stat-label{font-size:11px;color:var(--text2);margin-top:2px}
+.stat-val{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text)}
+.stat-val.pos{color:var(--green)}
+.stat-val.neg{color:var(--red)}
+.stat-val.accent{color:var(--accent)}
+.stat-val.primary{color:var(--primary)}
+
+/* ── Section title ── */
+.section-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── Tappe list ── */
+.tappa-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:8px}
+.tappa-info{flex:1}
+.tappa-name{font-weight:600;font-size:13px}
+.tappa-meta{font-size:12px;color:var(--text2);margin-top:3px}
+.badge{display:inline-block;background:var(--primary-faint);color:var(--primary);border:1px solid rgba(79,216,180,.2);border-radius:5px;padding:1px 7px;font-size:11px;font-weight:600}
+.badge.accent{background:var(--accent-faint);color:var(--accent);border-color:rgba(240,160,69,.2)}
+
+/* ── Budget chart ── */
+.chart-wrap{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}
+.chart-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+
+/* ── Grid ── */
+.grid-wrap{overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-top:12px;max-height:calc(100vh - 280px)}
+.data-grid{display:grid;min-width:max-content}
+.cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px 8px;display:flex;align-items:center;justify-content:center;font-size:12px;min-height:34px}
+.cell.sticky-l{position:sticky;left:0;z-index:4;background:inherit}
+.cell.sticky-l2{position:sticky;left:180px;z-index:4;background:inherit}
+.cell.label-cell{justify-content:flex-start;font-size:12px;font-weight:500;color:var(--text2);padding-left:12px;min-width:180px}
+.cell.total-cell{font-family:'Syne',sans-serif;font-size:12px;font-weight:600;color:var(--primary);min-width:90px}
+.cell.col-head{flex-direction:column;gap:1px;font-size:11px;font-weight:600;background:var(--card2);color:var(--text2)}
+.cell.col-head strong{color:var(--text);font-size:12px}
+.cell.input-cell{padding:0}
+.cell.input-cell input{width:100%;height:100%;min-width:88px;background:transparent;border:none;color:var(--text);font-size:12px;font-family:inherit;text-align:center;padding:0 4px}
+.cell.input-cell input:focus{outline:none;background:rgba(79,216,180,.05)}
+.cell.input-cell input[type=text]{text-align:left;padding-left:6px}
+.cell.input-cell input::placeholder{color:var(--text3);font-style:italic;font-size:11px}
+.cell.derived{font-family:'Syne',sans-serif;font-size:12px;font-weight:600}
+.cell.derived.neg{color:var(--red)}
+.cell.derived.pos{color:var(--green)}
+.group-sep{grid-column:1/-1;height:3px;background:var(--bg2);border-bottom:1px solid var(--border)}
+
+/* ── Tappa calc summary ── */
+.tappa-summary{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;flex-wrap:wrap;gap:14px;margin:14px 0 0;font-size:13px}
+.tappa-summary>div{display:flex;flex-direction:column;gap:2px}
+.tappa-summary span{font-size:11px;color:var(--text2)}
+.tappa-summary strong{font-family:'Syne',sans-serif;font-size:15px}
+.tappa-summary strong.accent{color:var(--accent)}
+.tappa-summary strong.primary{color:var(--primary)}
+
+/* ── Empty / Loading ── */
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty-icon{font-size:48px;margin-bottom:12px}
+
+/* ── Misc ── */
+.flex{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.grow{flex:1}
+.text-muted{color:var(--text2)}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.collapse-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:12px;padding:2px 6px;font-family:'Noto Sans',sans-serif}
+.collapse-btn:hover{color:var(--primary)}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:rgba(30,40,35,.95);border:1px solid var(--border2);
+  color:var(--text);padding:10px 20px;border-radius:20px;font-size:13px;
+  z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s,transform .2s;
+  white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Panoramica view ── */
+.pan-wrap{overflow-x:auto;margin-top:8px;border-radius:14px;border:1px solid var(--border)}
+.pan-table{border-collapse:collapse;min-width:100%;background:var(--card)}
+.pan-table th{
+  background:var(--card2);padding:6px 10px;font-size:10px;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;color:var(--text3);
+  border-bottom:2px solid var(--border2);white-space:nowrap;text-align:center;
+}
+.pan-table th.sticky-col{text-align:left;position:sticky;left:0;z-index:3;background:var(--card2)}
+.pan-table th.th-date{min-width:110px}
+.pan-table td{
+  border-bottom:1px solid var(--border);border-right:1px solid var(--border);
+  padding:0;white-space:nowrap;
+}
+.pan-table td.sticky-col{
+  position:sticky;left:0;z-index:2;background:var(--card);
+  border-right:2px solid var(--border2);
+}
+.pan-table tr:last-child td{border-bottom:none}
+.pan-table tr:hover td{background:rgba(79,216,180,.03)}
+.pan-table tr:hover td.sticky-col{background:var(--card)}
+
+/* date cell */
+.pan-date-cell{
+  display:flex;align-items:center;gap:8px;padding:0 10px;
+  cursor:pointer;user-select:none;min-height:42px;
+}
+.pan-date-cell:active{opacity:.7}
+.pan-gnum{font-family:'Syne',sans-serif;font-size:12px;font-weight:800;color:var(--primary);min-width:24px}
+.pan-dow{font-size:11px;color:var(--text3);min-width:22px}
+.pan-d{font-size:12px;color:var(--text2);min-width:32px}
+.pan-where{font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.pan-where.empty{color:var(--text3);font-style:italic}
+
+/* amount cell */
+.pan-amt{
+  min-width:68px;height:42px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;cursor:pointer;transition:filter .12s;position:relative;
+}
+.pan-amt:active{filter:brightness(1.3)}
+.pan-amt.zero{color:var(--text3);font-size:10px}
+.pan-amt.has-val{font-weight:600}
+/* category color bands */
+.pan-amt.cat-struttura{background:rgba(24,40,30,.6);color:#7ec8a0}
+.pan-amt.cat-struttura.has-val{background:rgba(24,40,30,1)}
+.pan-amt.cat-viaggio{background:rgba(24,34,42,.6);color:#7ab0d4}
+.pan-amt.cat-viaggio.has-val{background:rgba(24,34,42,1)}
+.pan-amt.cat-cibo{background:rgba(38,32,26,.6);color:#d4a47a}
+.pan-amt.cat-cibo.has-val{background:rgba(38,32,26,1)}
+/* km special */
+.pan-amt.cat-km{background:rgba(24,34,42,.6);color:#7ab0d4}
+.pan-amt.cat-km.has-val{background:rgba(18,26,36,1);color:#9bc8e8}
+
+/* total cell */
+.pan-total-cell{
+  height:42px;padding:0 10px;display:flex;align-items:center;gap:6px;
+  cursor:pointer;border-left:2px solid var(--border2);
+}
+.pan-total-bar{height:6px;border-radius:3px;background:var(--accent);opacity:.7;min-width:2px;max-width:80px;transition:width .2s}
+.pan-total-num{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--accent);min-width:48px;text-align:right}
+.pan-total-num.zero{color:var(--text3);font-weight:400}
+
+/* budget residuo cell */
+.pan-budget-cell{
+  height:42px;padding:0 10px;display:flex;align-items:center;justify-content:flex-end;
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:600;min-width:72px;
+}
+.pan-budget-cell.pos{color:var(--green)}
+.pan-budget-cell.neg{color:var(--red)}
+
+/* totals row */
+.pan-table tfoot td{
+  background:var(--card2);border-top:2px solid var(--border2);
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);
+  padding:8px 10px;text-align:center;
+}
+.pan-table tfoot td.sticky-col{background:var(--card2);text-align:left;color:var(--text2);font-size:11px}
+
+/* summary/flow cells */
+.pan-flow-cell{
+  height:42px;padding:0 8px;display:flex;align-items:center;justify-content:flex-end;
+  font-size:12px;font-weight:600;min-width:62px;cursor:pointer;
+  font-family:'Syne',sans-serif;
+}
+.pan-flow-cell.day{color:var(--accent)}
+.pan-flow-cell.day.zero{color:var(--text3);font-weight:400;font-family:inherit}
+.pan-flow-cell.prog{color:var(--text2);font-size:11px;font-weight:500;font-family:inherit}
+.pan-flow-cell.cassa-day{color:#c0d080}
+.pan-flow-cell.cassa-day.zero{color:var(--text3);font-weight:400}
+.pan-flow-cell.cassa-prog{color:var(--text3);font-size:11px;font-weight:500;font-family:inherit}
+.pan-flow-cell.budget-pos{color:var(--green)}
+.pan-flow-cell.budget-neg{color:var(--red)}
+th.th-group-sep{border-left:2px solid var(--border2)!important}
+
+.pan-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;padding:2px 4px}
+.pan-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.pan-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ── View mode toggle ── */
+.view-toggle{
+  display:flex;background:var(--card2);border:1px solid var(--border);
+  border-radius:9px;padding:3px;gap:2px;flex-shrink:0;
+}
+.view-toggle button{
+  background:transparent;border:none;color:var(--text2);
+  padding:6px 12px;border-radius:7px;font-size:12px;font-weight:500;
+  transition:all .15s;
+}
+.view-toggle button.active{background:var(--card);color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+
+/* ── Fullscreen grid ── */
+.grid-fs-overlay{
+  position:fixed;inset:0;z-index:50;background:var(--bg);
+  display:flex;flex-direction:column;
+  animation:fadeIn .15s ease;
+}
+.grid-fs-header{
+  background:var(--card);border-bottom:1px solid var(--border2);
+  padding:0 14px;height:52px;display:flex;align-items:center;gap:10px;flex-shrink:0;
+}
+.grid-fs-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid-fs-body{flex:1;overflow:auto;min-height:0;}
+.grid-fs-body .grid-wrap{max-height:100%;border-radius:0;border:none;border-top:1px solid var(--border);height:100%}
+
+/* ── Print ── */
+@media print{
+  .no-print{display:none!important}
+  .app-header .header-actions{display:none}
+  body{background:#fff;color:#000}
+  .card,.card-sm,.stat-card,.chart-wrap,.tappa-item{background:#fff;border-color:#ccc}
+  .grid-wrap{max-height:none;overflow:visible}
+  .data-grid .cell.sticky-l,.data-grid .cell.sticky-l2{position:static}
+  .cell{border-color:#ccc;color:#000}
+  .cell.col-head,.cell.label-cell{color:#333;background:#f5f5f5!important}
+  .stat-val,.cell.derived{color:#000}
+  .btn-tab,.btn-row{display:none!important}
+}
+</style>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#0c1210"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Viaggi Camper"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js")}</script>
+</head>
+<body>
+<div id="root"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+// ── Back handler system ───────────────────────────────────────────────────
+// Stack of close-functions; topmost is called on Android back press.
+window._backStack = [];
+let _lastBackTime = 0;
+let _toastTimer   = null;
+
+function _showToast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>el.classList.remove("show"), 2000);
+}
+
+// Always keep one extra history entry so popstate always fires before leaving
+window.history.pushState({camper:true}, "");
+
+window.addEventListener("popstate", function(){
+  // Re-push so there's always something to intercept next time
+  window.history.pushState({camper:true}, "");
+  if(window._backStack.length > 0){
+    window._backStack[window._backStack.length - 1]();
+  } else {
+    // Home screen: double-back to exit
+    const now = Date.now();
+    if(now - _lastBackTime < 2200){
+      // Remove our extra state and actually go back to exit
+      window.history.go(-2);
+    } else {
+      _lastBackTime = now;
+      _showToast("🔙 Premi ancora per uscire");
+    }
+  }
+});
+</script>
+
+<script type="text/babel">
+// ── Back hook ──────────────────────────────────────────────────────────────
+// Each component that "owns" a back action registers here.
+// The hook stacks/unstacks automatically on mount/unmount.
+function useBack(fn){
+  const fnRef = React.useRef(fn);
+  fnRef.current = fn; // always up to date without re-registering
+  React.useEffect(()=>{
+    const handler = ()=> fnRef.current();
+    window._backStack.push(handler);
+    return ()=>{
+      const idx = window._backStack.lastIndexOf(handler);
+      if(idx !== -1) window._backStack.splice(idx, 1);
+    };
+  }, []); // register once on mount, remove on unmount
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const SK = "viaggi_camper_v4";
+const MAX_DAYS = 90;
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+const diffInclusive = (s,e) => {
+  if(!s||!e) return 0;
+  return Math.max(0, Math.round((new Date(e+"T12:00:00")-new Date(s+"T12:00:00"))/86400000)+1);
+};
+const addDays = (d,n) => { const dt=new Date(d+"T12:00:00"); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+const fmtShort = d => { if(!d) return ""; const [,m,dd]=d.split("-"); return `${dd}/${m}`; };
+const fmtDate  = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/${m}/${y}`; };
+const n = v => +(v||0);
+const fmt2 = v => v.toFixed(2);
+const fmtH = h => { if(h==null||isNaN(h)) return ""; const s=h<0?"-":"",a=Math.abs(h); return `${s}${Math.floor(a)}h ${Math.floor((a%1)*60)}m`; };
+
+// ── Data ───────────────────────────────────────────────────────────────────
+const makeDay = date => ({
+  date, idTappa:"", luogo:"", struttura:"",
+  piazzola:0, tassa:0, extraStruttura:0, pagamentoManual:"",
+  benzina:0, gasolio:0, pedaggi:0, km:0, velocita:0,
+  spesa:0, cena:0, colazione:0, extraVar:0
+});
+const buildDays = (s,e,old=[]) => {
+  const cnt = Math.min(MAX_DAYS, diffInclusive(s,e));
+  return Array.from({length:cnt},(_,i) => {
+    const date = addDays(s,i), prev=old.find(d=>d.date===date);
+    return prev ? {...makeDay(date),...prev} : makeDay(date);
+  });
+};
+const createTrip = ({nome,budget,startDate,endDate}) => {
+  const days = buildDays(startDate,endDate,[]);
+  return {
+    id: Date.now()+(Math.random()*999|0), nome,
+    budget:n(budget), startDate, endDate,
+    preventivo: days, consuntivo: days.map(d=>({...d})),
+    tappe:[]
+  };
+};
+
+// ── Row definitions ─────────────────────────────────────────────────────────
+const ROWS = [
+  {key:"idTappa",        label:"ID tappa",            type:"text",   group:"struttura"},
+  {key:"luogo",          label:"Luogo",               type:"text",   group:"struttura"},
+  {key:"struttura",      label:"Struttura",           type:"text",   group:"struttura"},
+  {key:"piazzola",       label:"Piazzola €",          type:"num",    group:"struttura"},
+  {key:"tassa",          label:"Tassa soggiorno €",   type:"num",    group:"struttura"},
+  {key:"extraStruttura", label:"Extra struttura €",   type:"num",    group:"struttura"},
+  {key:"pagamentoManual",label:"Pag. manuale € *",    type:"numopt", group:"struttura"},
+  {key:"benzina",        label:"Benzina €",           type:"num",    group:"viaggio"},
+  {key:"gasolio",        label:"Gasolio €",           type:"num",    group:"viaggio"},
+  {key:"pedaggi",        label:"Pedaggi €",           type:"num",    group:"viaggio"},
+  {key:"km",             label:"KM",                  type:"num",    group:"viaggio"},
+  {key:"velocita",       label:"Velocità media",      type:"num",    group:"viaggio"},
+  {key:"spesa",          label:"Spesa €",             type:"num",    group:"cibo"},
+  {key:"cena",           label:"Cena €",              type:"num",    group:"cibo"},
+  {key:"colazione",      label:"Colazione €",         type:"num",    group:"cibo"},
+  {key:"extraVar",       label:"Extra €",             type:"num",    group:"cibo"},
+];
+const GROUP_COLS = {struttura:["--col-s0","--col-s1"], viaggio:["--col-v0","--col-v1"], cibo:["--col-c0","--col-c1"]};
+
+// ── Calcs ──────────────────────────────────────────────────────────────────
+const calcPagamento = (days,idx) => {
+  const d=days[idx]; if(!d) return 0;
+  if(!d.idTappa) return n(d.pagamentoManual);
+  const prev=days[idx-1];
+  const isChk = prev && prev.idTappa===d.idTappa && n(d.piazzola)===0 && n(d.tassa)===0 && n(d.extraStruttura)===0;
+  if(isChk){
+    const sum=days.reduce((a,x)=>x.idTappa===d.idTappa?a+n(x.piazzola)+n(x.tassa)+n(x.extraStruttura):a,0);
+    return n(d.pagamentoManual!==""?d.pagamentoManual:sum);
+  }
+  return n(d.pagamentoManual);
+};
+const calcCosto = d => ["piazzola","tassa","extraStruttura","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0);
+const calcCassa = (days,idx) => { const d=days[idx]; return calcPagamento(days,idx)+["benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0); };
+const calcBudgetSeries = (days,budget) => { let c=n(budget); return days.map((_,i)=>{c-=calcCassa(days,i);return c;}); };
+const calcTempoNum = d => n(d.velocita)>0 ? n(d.km)/n(d.velocita) : null;
+
+const getStats = (data, budget) => {
+  const bdg = calcBudgetSeries(data, budget);
+  return {
+    giorni:  data.length,
+    km:      data.reduce((a,d)=>a+n(d.km),0),
+    guida:   data.reduce((a,d)=>a+(calcTempoNum(d)||0),0),
+    notti:   data.filter(d=>d.idTappa||n(d.piazzola)>0).length,
+    struttura: data.reduce((a,d)=>a+n(d.piazzola)+n(d.tassa)+n(d.extraStruttura),0),
+    carburante:data.reduce((a,d)=>a+n(d.benzina)+n(d.gasolio)+n(d.pedaggi),0),
+    vitto:   data.reduce((a,d)=>a+n(d.spesa)+n(d.cena)+n(d.colazione),0),
+    extra:   data.reduce((a,d)=>a+n(d.extraVar),0),
+    totale:  data.reduce((a,d)=>a+calcCosto(d),0),
+    residuo: bdg.length ? bdg[bdg.length-1] : n(budget),
+    media:   data.length ? data.reduce((a,d)=>a+calcCosto(d),0)/data.length : 0,
+    bdgSeries: bdg
+  };
+};
+
+// ── CSV Export ─────────────────────────────────────────────────────────────
+const exportCSV = (viaggio, tab) => {
+  const data = viaggio[tab];
+  const bdg  = calcBudgetSeries(data, viaggio.budget);
+  const hdr  = ["Data",...ROWS.map(r=>r.label),"Pagamento €","Costo €","Spesa Cassa €","Budget €"];
+  const rows = data.map((d,i) => [
+    d.date, ...ROWS.map(r=>d[r.key]??""),
+    fmt2(calcPagamento(data,i)), fmt2(calcCosto(d)), fmt2(calcCassa(data,i)), fmt2(bdg[i])
+  ]);
+  const csv = [hdr,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\n");
+  const a   = document.createElement("a");
+  a.href    = URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"}));
+  a.download= `${viaggio.nome}_${tab}.csv`;
+  a.click();
+};
+
+// ── Reusable components ────────────────────────────────────────────────────
+function Modal({title, onClose, children, width="520px"}){
+  useBack(onClose);
+  React.useEffect(()=>{
+    const fn=e=>e.key==="Escape"&&onClose();
+    window.addEventListener("keydown",fn);
+    return ()=>window.removeEventListener("keydown",fn);
+  },[]);
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal-box" style={{maxWidth:width}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{title}</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Confirm({msg, onOk, onClose}){
+  return (
+    <Modal title="Conferma eliminazione" onClose={onClose} width="380px">
+      <p style={{color:"var(--text2)",lineHeight:1.6,marginBottom:20}}>{msg}</p>
+      <div className="flex">
+        <button className="btn-danger" onClick={()=>{onOk();onClose();}}>Sì, elimina</button>
+        <button className="btn" onClick={onClose}>Annulla</button>
+      </div>
+    </Modal>
+  );
+}
+
+function NumField({label, value, onChange, placeholder="0"}){
+  return (
+    <div className="field">
+      <label className="field-label">{label}</label>
+      <input type="number" className="field-input" value={value??""} placeholder={placeholder}
+        onFocus={e=>e.target.select()}
+        onChange={e=>onChange(e.target.value===""?0:+e.target.value)}/>
+    </div>
+  );
+}
+
+// ── Budget Chart ───────────────────────────────────────────────────────────
+function BudgetChart({days, budget}){
+  const series = calcBudgetSeries(days, budget);
+  if(series.length < 2) return null;
+  const W=800,H=180,PL=68,PR=30,PT=18,PB=36;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const maxV=Math.max(n(budget),...series), minV=Math.min(0,...series);
+  const rng=maxV-minV||1;
+  const toX=i=>PL+(i/(series.length-1))*cW;
+  const toY=v=>PT+(1-(v-minV)/rng)*cH;
+  const zY=toY(0);
+  const pts=series.map((v,i)=>`${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+  const area=`M ${toX(0).toFixed(1)},${toY(series[0]).toFixed(1)} `+
+    series.slice(1).map((v,i)=>`L ${toX(i+1).toFixed(1)},${toY(v).toFixed(1)}`).join(" ")+
+    ` L ${toX(series.length-1).toFixed(1)},${(PT+cH).toFixed(1)} L ${toX(0).toFixed(1)},${(PT+cH).toFixed(1)} Z`;
+  const step=Math.max(1,Math.ceil(series.length/10));
+  const lblIdx=series.map((_,i)=>(i%step===0||i===series.length-1)?i:-1).filter(i=>i>=0);
+  const lastV=series[series.length-1];
+  const yLabels=[];
+  [maxV,0,minV<0?minV:null].filter(v=>v!=null).forEach((v,i)=>{
+    yLabels.push({v,y:toY(v),neg:v<0});
+  });
+  return (
+    <div className="chart-wrap no-print" style={{display:"block"}}>
+      <div className="chart-title">Andamento budget</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block"}}>
+        <defs>
+          <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#4fd8b4" stopOpacity="0.25"/>
+            <stop offset="100%" stopColor="#4fd8b4" stopOpacity="0.0"/>
+          </linearGradient>
+          <linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f06060" stopOpacity="0.18"/>
+            <stop offset="100%" stopColor="#f06060" stopOpacity="0.0"/>
+          </linearGradient>
+        </defs>
+        {/* Grid lines */}
+        {[0,.25,.5,.75,1].map((f,i)=>(
+          <line key={i} x1={PL} y1={PT+f*cH} x2={W-PR} y2={PT+f*cH} stroke="rgba(255,255,255,.04)" strokeWidth="1"/>
+        ))}
+        {/* Zero line */}
+        {minV<0 && <line x1={PL} y1={zY} x2={W-PR} y2={zY} stroke="#f06060" strokeDasharray="5,4" strokeWidth="1.5" opacity=".7"/>}
+        {/* Area */}
+        <path d={area} fill={lastV>=0?"url(#cg)":"url(#cg2)"}/>
+        {/* Line */}
+        <polyline points={pts} fill="none" stroke={lastV>=0?"#4fd8b4":"#f06060"} strokeWidth="2.5" strokeLinejoin="round"/>
+        {/* Dots at each point */}
+        {series.map((v,i)=>(
+          <circle key={i} cx={toX(i)} cy={toY(v)} r="2.5" fill={v>=0?"#4fd8b4":"#f06060"}/>
+        ))}
+        {/* X labels */}
+        {lblIdx.map(i=>(
+          <text key={i} x={toX(i)} y={H-6} textAnchor="middle" fontSize="10" fill="#4a6a58">{fmtShort(days[i].date)}</text>
+        ))}
+        {/* Y labels */}
+        {yLabels.map(({v,y,neg},i)=>(
+          <text key={i} x={PL-6} y={y+3.5} textAnchor="end" fontSize="10" fill={neg?"#f06060":"#4a6a58"}>
+            {v>=0?`€${Math.round(v)}`:`-€${Math.abs(Math.round(v))}`}
+          </text>
+        ))}
+        {/* Last value label */}
+        <text x={toX(series.length-1)+8} y={toY(lastV)+4} fontSize="11" fontWeight="700"
+          fill={lastV>=0?"#4fd8b4":"#f06060"}>
+          {lastV>=0?`€${lastV.toFixed(0)}`:`-€${Math.abs(lastV).toFixed(0)}`}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+// ── Stats Panel ────────────────────────────────────────────────────────────
+function StatsPanel({data, budget}){
+  const s = getStats(data, budget);
+  const cards = [
+    {icon:"📅", label:"Giorni",          val:s.giorni,           fmt:v=>`${v}`,       cls:""},
+    {icon:"🛣️", label:"KM totali",       val:s.km,               fmt:v=>`${v.toFixed(0)} km`,cls:""},
+    {icon:"⏱️", label:"Tempo guida",     val:s.guida,            fmt:fmtH,            cls:""},
+    {icon:"🌙", label:"Notti struttura", val:s.notti,            fmt:v=>`${v}`,       cls:""},
+    {icon:"🏕️", label:"Strutture",       val:s.struttura,        fmt:v=>`€ ${fmt2(v)}`,cls:"accent"},
+    {icon:"⛽", label:"Carburante",      val:s.carburante,       fmt:v=>`€ ${fmt2(v)}`,cls:"accent"},
+    {icon:"🍽️", label:"Vitto",           val:s.vitto,            fmt:v=>`€ ${fmt2(v)}`,cls:"accent"},
+    {icon:"📦", label:"Extra",           val:s.extra,            fmt:v=>`€ ${fmt2(v)}`,cls:""},
+    {icon:"💰", label:"Totale spese",    val:s.totale,           fmt:v=>`€ ${fmt2(v)}`,cls:"primary"},
+    {icon:"📊", label:"Media/giorno",    val:s.media,            fmt:v=>`€ ${fmt2(v)}`,cls:""},
+    {icon:"🎯", label:"Budget residuo",  val:s.residuo,          fmt:v=>`€ ${fmt2(v)}`,cls:s.residuo>=0?"pos":"neg"},
+  ];
+  return (
+    <div className="stats-grid">
+      {cards.map(({icon,label,val,fmt,cls})=>(
+        <div key={label} className="stat-card">
+          <div className="stat-icon">{icon}</div>
+          <div className="stat-label">{label}</div>
+          <div className={`stat-val ${cls}`}>{fmt(val)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Grid Editor ────────────────────────────────────────────────────────────
+// ── Panoramica View ────────────────────────────────────────────────────────
+const DAYS_OF_WEEK = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
+
+// Columns definition for the panoramic view
+const PAN_COLS = [
+  // struttura group
+  {key:"piazzola",       label:"Piazzola",  cat:"struttura", abbr:"Piaz"},
+  {key:"tassa",          label:"Tassa sogg",cat:"struttura", abbr:"Tassa"},
+  {key:"extraStruttura", label:"Extra str.", cat:"struttura", abbr:"X-str"},
+  // viaggio group
+  {key:"km",             label:"KM",        cat:"km",        abbr:"KM",  isKm:true},
+  {key:"benzina",        label:"Benzina",   cat:"viaggio",   abbr:"Benz"},
+  {key:"gasolio",        label:"Gasolio",   cat:"viaggio",   abbr:"Gas"},
+  {key:"pedaggi",        label:"Pedaggi",   cat:"viaggio",   abbr:"Ped"},
+  // cibo group
+  {key:"spesa",          label:"Spesa",     cat:"cibo",      abbr:"Spesa"},
+  {key:"cena",           label:"Cena",      cat:"cibo",      abbr:"Cena"},
+  {key:"colazione",      label:"Colaz.",    cat:"cibo",      abbr:"Col"},
+  {key:"extraVar",       label:"Extra",     cat:"cibo",      abbr:"Extra"},
+];
+
+function PanoramicaView({data, budget, onOpenDetail}){
+  if(!data.length) return <div className="empty"><div className="empty-icon">📋</div><p>Nessun giorno nel periodo.</p></div>;
+
+  const budgetSeries = calcBudgetSeries(data, budget);
+  const maxCosto = Math.max(1, ...data.map(d=>calcCosto(d)));
+
+  // progressivi
+  let progCosto = 0, progCassa = 0;
+  const progressivi = data.map((d,i)=>{
+    progCosto += calcCosto(d);
+    progCassa += calcCassa(data, i);
+    return {costo: calcCosto(d), progCosto, cassa: calcCassa(data,i), progCassa};
+  });
+
+  // column totals
+  const colTotals = PAN_COLS.reduce((acc,c)=>({...acc,[c.key]:data.reduce((a,d)=>a+n(d[c.key]),0)}), {});
+
+  const amtCell = (d, col, i) => {
+    const v = n(d[col.key]);
+    const hasVal = v > 0;
+    const display = col.isKm
+      ? (hasVal ? `${v}` : "·")
+      : (hasVal ? `${v%1===0?v:v.toFixed(1)}` : "·");
+    return (
+      <td key={col.key}>
+        <div
+          className={`pan-amt cat-${col.cat}${hasVal?" has-val":""}`}
+          onClick={()=>onOpenDetail(i)}
+          title={`${col.label}: ${hasVal?(col.isKm?v+" km":"€"+fmt2(v)):"—"}`}
+        >
+          {display}
+        </div>
+      </td>
+    );
+  };
+
+  return (
+    <div>
+      <div className="pan-wrap">
+        <table className="pan-table">
+          <thead>
+            <tr>
+              <th className="sticky-col th-date">Giorno</th>
+              {PAN_COLS.map(c=>(
+                <th key={c.key} className={`cat-head-${c.cat}`}
+                  style={{borderLeft: c.key==="km"||c.key==="spesa" ? "2px solid var(--border2)" : undefined}}>
+                  {c.abbr}
+                </th>
+              ))}
+              <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>Costo g.</th>
+              <th title="Costo progressivo">∑Costo</th>
+              <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>Cassa g.</th>
+              <th title="Cassa progressiva">∑Cassa</th>
+              <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>Budget</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((d,i)=>{
+              const costo  = progressivi[i].costo;
+              const pcosto = progressivi[i].progCosto;
+              const cassa  = progressivi[i].cassa;
+              const pcassa = progressivi[i].progCassa;
+              const resid  = budgetSeries[i];
+              const dow    = d.date ? DAYS_OF_WEEK[new Date(d.date+"T12:00:00").getDay()] : "";
+              const isSun  = d.date && new Date(d.date+"T12:00:00").getDay()===0;
+              const isSat  = d.date && new Date(d.date+"T12:00:00").getDay()===6;
+              const isWeekend = isSun||isSat;
+              return (
+                <tr key={d.date||i} style={isWeekend?{background:"rgba(79,216,180,.02)"}:{}}>
+                  {/* sticky date cell */}
+                  <td className="sticky-col">
+                    <div className="pan-date-cell" onClick={()=>onOpenDetail(i)}>
+                      <span className="pan-gnum">G{i+1}</span>
+                      <span className="pan-dow" style={isWeekend?{color:"var(--primary)",opacity:.6}:{}}>{dow}</span>
+                      <span className="pan-d">{fmtShort(d.date)}</span>
+                      <span className={`pan-where${d.luogo?"":" empty"}`}>
+                        {d.luogo||"—"}
+                        {d.idTappa && <span style={{marginLeft:4,color:"var(--primary)",fontSize:10}}>●</span>}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* category amount cells */}
+                  {PAN_COLS.map(col=>{
+                    const borderLeft = col.key==="km"||col.key==="spesa" ? "2px solid var(--border2)" : undefined;
+                    const td = amtCell(d, col, i);
+                    return React.cloneElement(td, {style:{borderLeft}});
+                  })}
+
+                  {/* costo giorno */}
+                  <td style={{borderLeft:"2px solid var(--border2)"}}>
+                    <div className={`pan-flow-cell day${costo===0?" zero":""}`} onClick={()=>onOpenDetail(i)}>
+                      {costo===0?"—":`€${costo%1===0?costo:fmt2(costo)}`}
+                    </div>
+                  </td>
+                  {/* costo progressivo */}
+                  <td>
+                    <div className="pan-flow-cell prog" onClick={()=>onOpenDetail(i)}>
+                      €{pcosto%1===0?pcosto:fmt2(pcosto)}
+                    </div>
+                  </td>
+                  {/* cassa giorno */}
+                  <td style={{borderLeft:"2px solid var(--border2)"}}>
+                    <div className={`pan-flow-cell cassa-day${cassa===0?" zero":""}`} onClick={()=>onOpenDetail(i)}>
+                      {cassa===0?"—":`€${cassa%1===0?cassa:fmt2(cassa)}`}
+                    </div>
+                  </td>
+                  {/* cassa progressiva */}
+                  <td>
+                    <div className="pan-flow-cell cassa-prog" onClick={()=>onOpenDetail(i)}>
+                      €{pcassa%1===0?pcassa:fmt2(pcassa)}
+                    </div>
+                  </td>
+                  {/* budget residuo */}
+                  <td style={{borderLeft:"2px solid var(--border2)"}}>
+                    <div className={`pan-flow-cell ${resid>=0?"budget-pos":"budget-neg"}`} onClick={()=>onOpenDetail(i)}>
+                      {resid>=0?"":"−"}€{Math.abs(resid)%1===0?Math.abs(resid):fmt2(Math.abs(resid))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="sticky-col">Totali</td>
+              {PAN_COLS.map(c=>(
+                <td key={c.key} style={{borderLeft: c.key==="km"||c.key==="spesa"?"2px solid var(--border2)":undefined}}>
+                  <div style={{textAlign:"center",padding:"0 4px",fontSize:11,color:"var(--text2)"}}>
+                    {colTotals[c.key]>0 ? (c.isKm?colTotals[c.key]:fmt2(colTotals[c.key])) : ""}
+                  </div>
+                </td>
+              ))}
+              {/* costo tot */}
+              <td style={{borderLeft:"2px solid var(--border2)"}}>
+                <div style={{textAlign:"right",padding:"0 8px",color:"var(--accent)",fontSize:12}}>
+                  €{fmt2(progressivi[progressivi.length-1]?.progCosto??0)}
+                </div>
+              </td>
+              {/* ∑costo — same */}
+              <td><div style={{textAlign:"right",padding:"0 8px",color:"var(--text3)",fontSize:11}}>—</div></td>
+              {/* cassa tot */}
+              <td style={{borderLeft:"2px solid var(--border2)"}}>
+                <div style={{textAlign:"right",padding:"0 8px",color:"#c0d080",fontSize:12}}>
+                  €{fmt2(progressivi[progressivi.length-1]?.progCassa??0)}
+                </div>
+              </td>
+              {/* ∑cassa — same */}
+              <td><div style={{textAlign:"right",padding:"0 8px",color:"var(--text3)",fontSize:11}}>—</div></td>
+              {/* budget finale */}
+              <td style={{borderLeft:"2px solid var(--border2)"}}>
+                <div style={{textAlign:"right",padding:"0 8px",
+                  color:budgetSeries[budgetSeries.length-1]>=0?"var(--green)":"var(--red)",fontSize:12}}>
+                  €{fmt2(budgetSeries[budgetSeries.length-1]??0)}
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="pan-legend">
+        {[
+          {cat:"struttura", label:"Struttura", color:"rgba(24,40,30,1)"},
+          {cat:"km",        label:"KM",        color:"rgba(18,26,36,1)"},
+          {cat:"viaggio",   label:"Carburante/Pedaggi", color:"rgba(24,34,42,1)"},
+          {cat:"cibo",      label:"Cibo & Spese",       color:"rgba(38,32,26,1)"},
+        ].map(({cat,label,color})=>(
+          <div key={cat} className="pan-legend-item">
+            <div className="pan-legend-dot" style={{background:color, border:"1px solid var(--border2)"}}/>
+            {label}
+          </div>
+        ))}
+        <div className="pan-legend-item" style={{marginLeft:"auto",color:"var(--text3)",fontSize:10}}>
+          · = vuoto &nbsp; tocca cella → modifica giorno
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GridFSOverlay({onToggleFS, children}){
+  useBack(onToggleFS);
+  return (
+    <div className="grid-fs-overlay">
+      {children}
+    </div>
+  );
+}
+
+function GridEditor({data, budget, onChange, fullscreen=false, onToggleFS, onDayClick}){
+  if(!data.length) return <div className="empty"><div className="empty-icon">📋</div><p>Nessun giorno nel periodo.</p></div>;
+  const budgets = calcBudgetSeries(data, budget);
+  const nCols   = data.length;
+  const cols    = `180px 90px repeat(${nCols}, 88px)`;
+  const groups  = ["struttura","viaggio","cibo"];
+  const groupLabels = {struttura:"🏕️  Struttura", viaggio:"🛣️  Viaggio", cibo:"🍽️  Cibo & Spese"};
+
+  const getRowBg = (row, di) => {
+    const [c0,c1] = GROUP_COLS[row.group]||["--card","--card"];
+    return di%2===0 ? `var(${c0})` : `var(${c1})`;
+  };
+
+  const renderInput = (row, d, i) => {
+    const bg = getRowBg(row, i);
+    const base = {background:bg, padding:0};
+    if(row.type==="numopt"){
+      return (
+        <div key={i} className="cell input-cell" style={base}>
+          <input type="number" value={d[row.key]??""} placeholder="auto"
+            onChange={e=>onChange(i,row.key,e.target.value===""?"":+e.target.value)}/>
+        </div>
+      );
+    }
+    if(row.type==="num"){
+      return (
+        <div key={i} className="cell input-cell" style={base}>
+          <input type="number" value={d[row.key]===0?"":d[row.key]??""} placeholder="0"
+            onFocus={e=>e.target.select()}
+            onChange={e=>onChange(i,row.key,e.target.value===""?0:+e.target.value)}/>
+        </div>
+      );
+    }
+    return (
+      <div key={i} className="cell input-cell" style={base}>
+        <input type="text" value={d[row.key]??""} onChange={e=>onChange(i,row.key,e.target.value)}/>
+      </div>
+    );
+  };
+
+  const gridContent = (
+    <div className="grid-wrap">
+      <div className="data-grid" style={{gridTemplateColumns:cols}}>
+        {/* Header */}
+        <div className="cell sticky-l label-cell" style={{background:"var(--card2)",fontFamily:"'Syne',sans-serif",fontSize:11,letterSpacing:".5px",textTransform:"uppercase"}}>Voce</div>
+        <div className="cell sticky-l2 label-cell total-cell" style={{background:"var(--card2)"}}>Totale</div>
+        {data.map((d,i)=>(
+          <div key={i} className="cell col-head" onClick={()=>onDayClick&&onDayClick(i)}
+            style={onDayClick?{cursor:"pointer",userSelect:"none"}:{}}>
+            <strong>G{i+1}</strong>
+            <span>{fmtShort(d.date)}</span>
+            {onDayClick && <span style={{fontSize:9,color:"var(--primary)",opacity:.7,marginTop:1}}>✏️</span>}
+          </div>
+        ))}
+
+        {/* Groups */}
+        {groups.map(grp=>(
+          <React.Fragment key={grp}>
+            <div className="cell sticky-l" style={{background:"var(--bg2)",fontSize:11,fontFamily:"'Syne',sans-serif",fontWeight:700,color:"var(--text2)",letterSpacing:".5px",gridColumn:"1/2"}}>
+              {groupLabels[grp]}
+            </div>
+            <div className="cell sticky-l2" style={{background:"var(--bg2)"}}></div>
+            {data.map((_,i)=><div key={i} className="cell" style={{background:"var(--bg2)"}}></div>)}
+
+            {ROWS.filter(r=>r.group===grp).map((row,ri)=>{
+              const isNum = row.type!=="text";
+              const total = isNum ? data.reduce((a,d)=>a+n(d[row.key]),0) : null;
+              return (
+                <React.Fragment key={row.key}>
+                  <div className="cell sticky-l label-cell" style={{background:getRowBg(row,ri)}}>{row.label}</div>
+                  <div className="cell sticky-l2 total-cell" style={{background:getRowBg(row,ri)}}>
+                    {total!=null ? fmt2(total) : ""}
+                  </div>
+                  {data.map((d,i)=>renderInput(row,d,i))}
+                </React.Fragment>
+              );
+            })}
+          </React.Fragment>
+        ))}
+
+        {/* Derived rows */}
+        {[
+          {label:"Pagamento €",      vals:data.map((_,i)=>fmt2(calcPagamento(data,i))),  tot:fmt2(data.reduce((a,_,i)=>a+calcPagamento(data,i),0)), bg0:"--col-p0", bg1:"--col-p1"},
+          {label:"Costo giornata €", vals:data.map(d=>fmt2(calcCosto(d))),               tot:fmt2(data.reduce((a,d)=>a+calcCosto(d),0)),            bg0:"--col-b0", bg1:"--col-b1"},
+          {label:"Spesa cassa €",    vals:data.map((_,i)=>fmt2(calcCassa(data,i))),      tot:fmt2(data.reduce((a,_,i)=>a+calcCassa(data,i),0)),    bg0:"--col-b0", bg1:"--col-b1"},
+          {label:"Budget residuo €", vals:budgets.map(v=>fmt2(v)),                        tot:fmt2(budgets.length?budgets[budgets.length-1]:n(budget)), bg0:"--col-b0", bg1:"--col-b1", isBudget:true},
+          {label:"Tempo percorrenza",vals:data.map(d=>{const t=calcTempoNum(d);return t!=null?fmtH(t):"--";}), tot:fmtH(data.reduce((a,d)=>a+(calcTempoNum(d)||0),0)), bg0:"--col-v0", bg1:"--col-v1"},
+        ].map(({label,vals,tot,bg0,bg1,isBudget},ri)=>(
+          <React.Fragment key={label}>
+            {ri===0 && <>
+              <div className="cell sticky-l" style={{background:"var(--bg2)",height:4,minHeight:4}}></div>
+              <div className="cell sticky-l2" style={{background:"var(--bg2)",height:4,minHeight:4}}></div>
+              {data.map((_,i)=><div key={i} className="cell" style={{background:"var(--bg2)",height:4,minHeight:4}}></div>)}
+            </>}
+            <div className="cell sticky-l label-cell" style={{background:`var(${ri%2===0?bg0:bg1})`,fontWeight:600,color:"var(--text)"}}>
+              {label}
+            </div>
+            <div className="cell sticky-l2 derived" style={{background:`var(${ri%2===0?bg0:bg1})`, color: isBudget && +tot<0 ? "var(--red)" : isBudget ? "var(--green)" : "var(--accent)"}}>
+              {tot}
+            </div>
+            {vals.map((v,i)=>(
+              <div key={i} className={`cell derived ${isBudget?(+v<0?"neg":"pos"):""}`}
+                style={{background:`var(${i%2===0?bg0:bg1})`}}>
+                {v}
+              </div>
+            ))}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+
+  if(fullscreen){
+    return (
+      <GridFSOverlay onToggleFS={onToggleFS}>
+        <div className="grid-fs-header">
+          <span className="grid-fs-title">📋 Tabella giornaliera</span>
+          <span style={{fontSize:12,color:"var(--text2)"}}>← scorri orizzontale per i giorni</span>
+          <button className="btn btn-sm" onClick={onToggleFS} title="Esci da schermo intero">✕ Chiudi</button>
+        </div>
+        <div className="grid-fs-body">{gridContent}</div>
+      </GridFSOverlay>
+    );
+  }
+
+  return gridContent;
+}
+
+// ── Day Modal ──────────────────────────────────────────────────────────────
+const DAY_SECTIONS = [
+  {
+    title:"🏕️ Struttura",
+    fields:[
+      {key:"idTappa",         label:"ID tappa",              type:"text"},
+      {key:"luogo",           label:"Luogo",                 type:"text"},
+      {key:"struttura",       label:"Struttura",             type:"text"},
+      {key:"piazzola",        label:"Piazzola €",            type:"num"},
+      {key:"tassa",           label:"Tassa soggiorno €",     type:"num"},
+      {key:"extraStruttura",  label:"Extra struttura €",     type:"num"},
+      {key:"pagamentoManual", label:"Pagamento manuale €",   type:"numopt", hint:"Lascia vuoto per calcolo auto al checkout"},
+    ]
+  },
+  {
+    title:"🛣️ Viaggio",
+    fields:[
+      {key:"benzina",  label:"Benzina €",      type:"num"},
+      {key:"gasolio",  label:"Gasolio €",      type:"num"},
+      {key:"pedaggi",  label:"Pedaggi €",      type:"num"},
+      {key:"km",       label:"KM percorsi",    type:"num"},
+      {key:"velocita", label:"Velocità media", type:"num"},
+    ]
+  },
+  {
+    title:"🍽️ Cibo & Spese",
+    fields:[
+      {key:"spesa",    label:"Spesa €",     type:"num"},
+      {key:"cena",     label:"Cena €",      type:"num"},
+      {key:"colazione",label:"Colazione €", type:"num"},
+      {key:"extraVar", label:"Extra €",     type:"num"},
+    ]
+  },
+];
+
+function DayModal({dayIndex, data, budget, onClose, onChange}){
+  const d   = data[dayIndex];
+  const tot = calcCosto(d);
+  const pag = calcPagamento(data, dayIndex);
+  const cas = calcCassa(data, dayIndex);
+  const bdg = calcBudgetSeries(data, budget);
+  const res = bdg[dayIndex];
+  const tpNum = calcTempoNum(d);
+  const prevDay = dayIndex>0 ? data[dayIndex-1] : null;
+  const nextDay = dayIndex<data.length-1 ? data[dayIndex+1] : null;
+
+  const update = (key, val) => onChange(dayIndex, key, val);
+
+  return (
+    <Modal title={`Giorno ${dayIndex+1} — ${fmtDate(d.date)}`} onClose={onClose} width="580px">
+      {/* Nav between days */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,gap:8}}>
+        <button className="btn btn-sm" disabled={!prevDay} onClick={()=>onChange("__nav__",dayIndex-1,null)}
+          style={{opacity:prevDay?1:.3}}>← G{dayIndex} {prevDay?fmtShort(prevDay.date):""}</button>
+        <span style={{fontSize:12,color:"var(--text2)",textAlign:"center"}}>
+          {d.luogo||d.struttura ? <><strong style={{color:"var(--text)"}}>{d.luogo}</strong>{d.struttura&&<span> · {d.struttura}</span>}</> : <span style={{color:"var(--text3)"}}>nessuna tappa</span>}
+        </span>
+        <button className="btn btn-sm" disabled={!nextDay} onClick={()=>onChange("__nav__",dayIndex+1,null)}
+          style={{opacity:nextDay?1:.3}}>G{dayIndex+2} {nextDay?fmtShort(nextDay.date):""} →</button>
+      </div>
+
+      {/* Sections */}
+      {DAY_SECTIONS.map(sec=>(
+        <div key={sec.title} style={{marginBottom:16}}>
+          <div className="section-title" style={{marginBottom:8}}>{sec.title}</div>
+          <div className="form-grid">
+            {sec.fields.map(f=>(
+              <div key={f.key} className="field">
+                <label className="field-label">{f.label}</label>
+                {f.type==="text" ? (
+                  <input type="text" className="field-input" value={d[f.key]||""}
+                    onChange={e=>update(f.key, e.target.value)}/>
+                ) : f.type==="numopt" ? (
+                  <input type="number" className="field-input" value={d[f.key]??""} placeholder="auto"
+                    onFocus={e=>e.target.select()}
+                    onChange={e=>update(f.key, e.target.value===""?"":+e.target.value)}/>
+                ) : (
+                  <input type="number" className="field-input"
+                    value={d[f.key]===0?"":d[f.key]??""} placeholder="0"
+                    onFocus={e=>e.target.select()}
+                    onChange={e=>update(f.key, e.target.value===""?0:+e.target.value)}/>
+                )}
+                {f.hint && <span style={{fontSize:10,color:"var(--text3)",marginTop:2}}>{f.hint}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Summary strip */}
+      <div className="tappa-summary" style={{marginTop:4}}>
+        <div><span>Costo giornata</span><strong className="accent">€ {fmt2(tot)}</strong></div>
+        <div><span>Pagamento</span><strong>€ {fmt2(pag)}</strong></div>
+        <div><span>Spesa cassa</span><strong>€ {fmt2(cas)}</strong></div>
+        <div><span>Budget residuo</span><strong className={res>=0?"primary":""}style={res<0?{color:"var(--red)"}:{}}>{res>=0?"€ ":"-€"}{fmt2(Math.abs(res))}</strong></div>
+        {tpNum!=null && <div><span>Tempo guida</span><strong>{fmtH(tpNum)}</strong></div>}
+      </div>
+
+      <div className="btn-row">
+        <button className="btn-primary" onClick={onClose}>✓ Chiudi</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Tappa Modal ────────────────────────────────────────────────────────────
+function TappaModal({viaggio, onClose, onSave}){
+  const [f,setF] = React.useState({
+    startDate:viaggio.startDate, endDate:addDays(viaggio.startDate,1),
+    luogo:"", struttura:"",
+    costoPiazzola:0, costoPersona:0, numeroPersone:2,
+    elettricita:0, moto:0, tassaSoggiorno:0, extraStruttura:0
+  });
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  const notti = Math.max(0, diffInclusive(f.startDate, f.endDate)-1);
+  const perNotte = n(f.costoPiazzola)+n(f.costoPersona)*n(f.numeroPersone)+n(f.elettricita)+n(f.moto);
+  const tassaN   = n(f.tassaSoggiorno)*n(f.numeroPersone);
+  const totale   = (perNotte+tassaN)*notti;
+
+  return (
+    <Modal title="Nuova tappa" onClose={onClose} width="640px">
+      <div className="form-grid" style={{gap:12}}>
+        <div className="field">
+          <label className="field-label">Check-in</label>
+          <input type="date" className="field-input" value={f.startDate} onChange={e=>u("startDate",e.target.value)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Check-out</label>
+          <input type="date" className="field-input" value={f.endDate} onChange={e=>u("endDate",e.target.value)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Luogo</label>
+          <input type="text" className="field-input" value={f.luogo} onChange={e=>u("luogo",e.target.value)} placeholder="es. Roma"/>
+        </div>
+        <div className="field">
+          <label className="field-label">Struttura</label>
+          <input type="text" className="field-input" value={f.struttura} onChange={e=>u("struttura",e.target.value)} placeholder="es. Camping Bella Vista"/>
+        </div>
+        <NumField label="Costo piazzola €/notte"       value={f.costoPiazzola}    onChange={v=>u("costoPiazzola",v)}/>
+        <NumField label="Costo a persona €/notte"       value={f.costoPersona}     onChange={v=>u("costoPersona",v)}/>
+        <NumField label="Numero persone"                value={f.numeroPersone}    onChange={v=>u("numeroPersone",v)}/>
+        <NumField label="Elettricità €/notte"           value={f.elettricita}      onChange={v=>u("elettricita",v)}/>
+        <NumField label="Moto €/notte"                  value={f.moto}             onChange={v=>u("moto",v)}/>
+        <NumField label="Tassa soggiorno €/persona/notte" value={f.tassaSoggiorno} onChange={v=>u("tassaSoggiorno",v)}/>
+        <NumField label="Extra struttura €/notte"       value={f.extraStruttura}   onChange={v=>u("extraStruttura",v)}/>
+      </div>
+      <div className="tappa-summary">
+        <div><span>Notti</span><strong className="primary">{notti}</strong></div>
+        <div><span>Piazzola/notte</span><strong>€ {fmt2(perNotte)}</strong></div>
+        <div><span>Tassa/notte</span><strong>€ {fmt2(tassaN)}</strong></div>
+        <div><span>Totale stimato</span><strong className="accent">€ {fmt2(totale)}</strong></div>
+      </div>
+      <div className="btn-row">
+        <button className="btn-primary" onClick={()=>onSave(f)}>✓ Salva tappa</button>
+        <button className="btn" onClick={onClose}>Annulla</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── New / Edit Trip Modal ─────────────────────────────────────────────────
+function TripFormModal({initial, title, onClose, onSave}){
+  const today = new Date().toISOString().slice(0,10);
+  const [f,setF] = React.useState(initial || {nome:"",budget:1000,startDate:today,endDate:addDays(today,6)});
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  const giorni = diffInclusive(f.startDate, f.endDate);
+  const save=()=>{
+    if(!f.nome.trim()) return alert("Inserisci il nome del viaggio");
+    if(giorni<1) return alert("Le date non sono valide");
+    onSave(f); onClose();
+  };
+  return (
+    <Modal title={title} onClose={onClose} width="460px">
+      <div className="form-grid">
+        <div className="field" style={{gridColumn:"1/-1"}}>
+          <label className="field-label">Nome viaggio</label>
+          <input type="text" className="field-input" value={f.nome} onChange={e=>u("nome",e.target.value)} placeholder="es. Estate in Sardegna 2025"/>
+        </div>
+        <div className="field" style={{gridColumn:"1/-1"}}>
+          <label className="field-label">Budget iniziale €</label>
+          <input type="number" className="field-input" value={f.budget} onFocus={e=>e.target.select()} onChange={e=>u("budget",+e.target.value||0)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Partenza</label>
+          <input type="date" className="field-input" value={f.startDate} onChange={e=>u("startDate",e.target.value)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Rientro</label>
+          <input type="date" className="field-input" value={f.endDate} onChange={e=>u("endDate",e.target.value)}/>
+        </div>
+      </div>
+      {giorni>0 && <p style={{marginTop:12,fontSize:12,color:"var(--text2)"}}>⏱ {giorni} giorni · max {MAX_DAYS} giorni supportati</p>}
+      <div className="btn-row">
+        <button className="btn-primary" onClick={save}>✓ Salva</button>
+        <button className="btn" onClick={onClose}>Annulla</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Trip View ──────────────────────────────────────────────────────────────
+function TripView({viaggio, updateTrip, back}){
+  useBack(back);
+  const [tab, setTab]           = React.useState("preventivo");
+  const [showTappa, setTappa]   = React.useState(false);
+  const [showEdit, setEdit]     = React.useState(false);
+  const [delTappa, setDelTappa] = React.useState(null);
+  const [showStats, setStats]   = React.useState(true);
+  const [showChart, setChart]   = React.useState(false);
+  const [fsGrid, setFsGrid]     = React.useState(false);
+  const [dayModal, setDayModal] = React.useState(null);
+  const [viewMode, setViewMode] = React.useState("panoramica"); // "panoramica" | "tabella"
+  const data = viaggio[tab];
+
+  const updateCell = (i,k,v) => {
+    if(k==="__nav__"){ setDayModal(i); return; } // navigate day in modal
+    const copy = {...viaggio,[tab]:[...viaggio[tab]]};
+    copy[tab][i] = {...copy[tab][i],[k]:v};
+    updateTrip(copy);
+  };
+
+  const addTappa = form => {
+    const norm = d => (d||"").slice(0,10);
+    const sIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.startDate));
+    const eIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.endDate));
+    if(sIdx===-1||eIdx===-1||eIdx<=sIdx){ alert("Controlla le date della tappa (devono rientrare nel periodo del viaggio)"); return; }
+    const copy  = {...viaggio,[tab]:[...viaggio[tab]],tappe:[...(viaggio.tappe||[])]};
+    const idN   = (viaggio.tappe||[]).filter(x=>x.target===tab).length+1;
+    const idT   = `T${idN}`;
+    const piaz  = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
+    const tassa = n(form.tassaSoggiorno)*n(form.numeroPersone);
+    for(let i=sIdx;i<eIdx;i++){
+      copy[tab][i]={...copy[tab][i],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,extraStruttura:n(form.extraStruttura)};
+    }
+    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,extraStruttura:0};
+    copy.tappe.push({...form,id:Date.now(),target:tab,idTappa:idT});
+    updateTrip(copy);
+    setTappa(false);
+  };
+
+  const removeTappa = (tappa) => {
+    const copy = {...viaggio,[tab]:[...viaggio[tab]],tappe:(viaggio.tappe||[]).filter(t=>t.id!==tappa.id)};
+    copy[tab] = copy[tab].map(d => d.idTappa===tappa.idTappa ? {...d,idTappa:"",luogo:"",struttura:"",piazzola:0,tassa:0,extraStruttura:0} : d);
+    updateTrip(copy);
+  };
+
+  const editTrip = form => {
+    const newPreventivo = buildDays(form.startDate, form.endDate, viaggio.preventivo);
+    const newConsuntivo = buildDays(form.startDate, form.endDate, viaggio.consuntivo);
+    updateTrip({...viaggio,...form,budget:n(form.budget),preventivo:newPreventivo,consuntivo:newConsuntivo});
+  };
+
+  const tappe = (viaggio.tappe||[]).filter(t=>t.target===tab);
+
+  return (
+    <div>
+      <div className="app-header">
+        <div className="flex" style={{gap:12,minWidth:0}}>
+          <button className="btn-icon" onClick={back} title="Torna alla lista">←</button>
+          <div>
+            <div className="logo" style={{fontSize:15}}>{viaggio.nome}</div>
+            <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>{fmtDate(viaggio.startDate)} → {fmtDate(viaggio.endDate)} · {data.length} giorni</div>
+          </div>
+        </div>
+        <div className="header-actions">
+          <button className={`btn-tab ${tab==="preventivo"?"active":""}`} onClick={()=>setTab("preventivo")}>Preventivo</button>
+          <button className={`btn-tab ${tab==="consuntivo"?"active":""}`} onClick={()=>setTab("consuntivo")}>Consuntivo</button>
+          <button className="btn-icon no-print" onClick={()=>setTappa(true)} title="Aggiungi tappa">＋ Tappa</button>
+          <button className="btn-icon no-print" onClick={()=>exportCSV(viaggio,tab)} title="Esporta CSV">CSV</button>
+          <button className="btn-icon no-print" onClick={()=>window.print()} title="Stampa">🖨</button>
+          <button className="btn-icon no-print" onClick={()=>setEdit(true)} title="Modifica viaggio">✏️</button>
+        </div>
+      </div>
+
+      <div className="container">
+        {/* Tappe */}
+        {tappe.length>0 && (
+          <div style={{marginBottom:16}}>
+            <div className="section-title">Tappe {tab}</div>
+            {tappe.map(t=>(
+              <div key={t.id} className="tappa-item">
+                <div className="tappa-info">
+                  <div className="tappa-name">
+                    <span className="badge">{t.idTappa}</span>&nbsp;
+                    {t.luogo} — <span style={{color:"var(--text2)"}}>{t.struttura}</span>
+                  </div>
+                  <div className="tappa-meta">
+                    {fmtDate(t.startDate)} → {fmtDate(t.endDate)} &nbsp;·&nbsp; {Math.max(0,diffInclusive(t.startDate,t.endDate)-1)} notti &nbsp;·&nbsp;
+                    checkout: {fmtDate(t.endDate)}
+                  </div>
+                </div>
+                <button className="btn-icon btn-sm" style={{color:"var(--red)"}} onClick={()=>setDelTappa(t)} title="Elimina tappa">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Stats toggle */}
+        <div style={{display:"flex",gap:12,marginBottom:4}}>
+          <button className="collapse-btn" onClick={()=>setStats(p=>!p)}>{showStats?"▾":"▸"} Statistiche</button>
+          <button className="collapse-btn" onClick={()=>setChart(p=>!p)}>{showChart?"▾":"▸"} Grafico budget</button>
+        </div>
+
+        {showStats && <StatsPanel data={data} budget={viaggio.budget}/>}
+        {showChart && <BudgetChart days={data} budget={viaggio.budget}/>}
+
+        {/* View toggle + section header */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginTop:16,marginBottom:8,flexWrap:"wrap"}}>
+          <div className="section-title" style={{margin:0,flex:1,minWidth:120}}>
+            {viewMode==="panoramica"?"Panoramica":"Tabella dettaglio"} — {tab}
+          </div>
+          <div className="view-toggle no-print">
+            <button className={viewMode==="panoramica"?"active":""} onClick={()=>setViewMode("panoramica")}>📅 Panoramica</button>
+            <button className={viewMode==="tabella"?"active":""} onClick={()=>setViewMode("tabella")}>📊 Tabella</button>
+          </div>
+          {viewMode==="tabella" && (
+            <button className="btn btn-sm no-print" onClick={()=>setFsGrid(true)}
+              style={{display:"flex",alignItems:"center",gap:5,color:"var(--primary)",borderColor:"var(--primary-dim)"}}>
+              ⛶ Schermo intero
+            </button>
+          )}
+        </div>
+
+        {viewMode==="panoramica" && (
+          <PanoramicaView data={data} budget={viaggio.budget} onOpenDetail={i=>setDayModal(i)}/>
+        )}
+        {viewMode==="tabella" && (
+          <>
+            <p style={{fontSize:11,color:"var(--text3)",margin:"0 0 6px"}}>* Pag. manuale: lascia vuoto per calcolo automatico al checkout della tappa.</p>
+            <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} onDayClick={i=>setDayModal(i)}/>
+          </>
+        )}
+      </div>
+
+      {showTappa && <TappaModal viaggio={viaggio} onClose={()=>setTappa(false)} onSave={addTappa}/>}
+      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip}/>}
+      {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
+      {fsGrid && <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} fullscreen={true} onToggleFS={()=>setFsGrid(false)} onDayClick={i=>setDayModal(i)}/>}
+      {dayModal!==null && <DayModal dayIndex={dayModal} data={data} budget={viaggio.budget} onClose={()=>setDayModal(null)} onChange={updateCell}/>}
+    </div>
+  );
+}
+
+// ── Home View ──────────────────────────────────────────────────────────────
+function App(){
+  const [viaggi,setViaggi] = React.useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(SK)||"[]"); }catch{ return []; }
+  });
+  const [activeId,setActiveId] = React.useState(null);
+  const [showNew,setNew]       = React.useState(false);
+  const [delId,setDel]         = React.useState(null);
+
+  React.useEffect(()=>{ localStorage.setItem(SK,JSON.stringify(viaggi)); },[viaggi]);
+
+  const updateTrip = t => setViaggi(p=>p.map(v=>v.id===t.id?t:v));
+
+  if(activeId){
+    const v = viaggi.find(x=>x.id===activeId);
+    if(!v){ setActiveId(null); return null; }
+    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)}/>;
+  }
+
+  return (
+    <div>
+      <div className="app-header">
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v4.9</span></div>
+        <div className="header-actions">
+          <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
+        </div>
+      </div>
+      <div className="container">
+        {viaggi.length===0 && (
+          <div className="empty" style={{paddingTop:80}}>
+            <div className="empty-icon">🚐</div>
+            <p style={{marginBottom:16,color:"var(--text2)"}}>Nessun viaggio ancora. Crea il tuo primo!</p>
+            <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
+          </div>
+        )}
+        <div className="trips-grid">
+          {viaggi.map(v=>{
+            const giorni = diffInclusive(v.startDate,v.endDate);
+            const stats  = getStats(v.consuntivo||[], v.budget);
+            const hasData= (v.consuntivo||[]).some(d=>calcCosto(d)>0);
+            return (
+              <div key={v.id} className="trip-card" onClick={()=>setActiveId(v.id)}>
+                <div className="trip-card-name">{v.nome}</div>
+                <div className="trip-card-meta">
+                  <span>📅 {fmtDate(v.startDate)} → {fmtDate(v.endDate)}</span>
+                  <span>⏱ {giorni} giorni · {(v.tappe||[]).length} tappe</span>
+                </div>
+                <div className="trip-card-budget">
+                  <strong>{fmt2(n(v.budget))}</strong>
+                  <span style={{fontSize:12,color:"var(--text2)"}}>budget iniziale</span>
+                  {hasData && <span style={{fontSize:12,color:stats.residuo>=0?"var(--green)":"var(--red)",marginLeft:"auto"}}>residuo: €{fmt2(stats.residuo)}</span>}
+                </div>
+                <div className="trip-card-actions" onClick={e=>e.stopPropagation()}>
+                  <button className="btn-icon btn-sm" onClick={()=>setActiveId(v.id)} title="Apri">✏️ Apri</button>
+                  <button className="btn-icon btn-sm" style={{color:"var(--red)"}} onClick={()=>setDel(v.id)} title="Elimina">🗑</button>
+                </div>
+              </div>
+            );
+          })}
+          <div className="trip-card new-card" onClick={()=>setNew(true)} role="button">
+            <span style={{fontSize:24}}>＋</span>
+            <span>Nuovo viaggio</span>
+          </div>
+        </div>
+      </div>
+
+      {showNew && (
+        <TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)}
+          onSave={f=>{ setViaggi(p=>[...p,createTrip(f)]); }}/>
+      )}
+      {delId && (
+        <Confirm
+          msg={`Eliminare il viaggio "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`}
+          onOk={()=>setViaggi(p=>p.filter(v=>v.id!==delId))}
+          onClose={()=>setDel(null)}/>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
