@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v6.2</title>
+<title>🚐 Viaggi Camper v6.3</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -467,11 +467,12 @@ const buildDays = (s,e,old=[]) => {
     return prev ? {...makeDay(date),...prev} : makeDay(date);
   });
 };
-const createTrip = ({nome,budget,startDate,endDate}) => {
+const createTrip = ({nome,budget,startDate,endDate,veicolo="",consumoMedio:cm=0,prezzoCarburante:pc=0}) => {
   const days = buildDays(startDate,endDate,[]);
   return {
     id: Date.now()+(Math.random()*999|0), nome,
     budget:n(budget), startDate, endDate,
+    veicolo, consumoMedio:n(cm), prezzoCarburante:n(pc),
     preventivo: days, consuntivo: days.map(d=>({...d})),
     tappe:[]
   };
@@ -502,11 +503,11 @@ const GROUP_COLS = {struttura:["--col-s0","--col-s1"], viaggio:["--col-v0","--co
 const calcPagamento = (days,idx) => {
   const d=days[idx]; if(!d) return 0;
   if(!d.idTappa) return n(d.pagamentoManual);
-  const prev=days[idx-1];
   const next=days[idx+1];
-  // Pagamento sull'ULTIMO giorno consecutivo della tappa:
-  // funziona anche quando il giorno di checkout viene sovrascritto dalla tappa successiva
-  const isLastDay = prev?.idTappa===d.idTappa && next?.idTappa!==d.idTappa;
+  // Pagamento sull'ultimo giorno con questo idTappa
+  // (il giorno successivo ha idTappa diverso, o non esiste)
+  // Funziona per 1 notte, più notti, tappe consecutive
+  const isLastDay = next?.idTappa !== d.idTappa;
   if(isLastDay){
     const sum=days.reduce((a,x)=>x.idTappa===d.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
     return n(d.pagamentoManual!==""?d.pagamentoManual:sum);
@@ -727,11 +728,12 @@ function PanoramicaView({data, budget, onOpenDetail}){
   const maxCosto = Math.max(1, ...data.map(d=>calcCosto(d)));
 
   // progressivi
-  let progCosto = 0, progCassa = 0;
+  let progCosto = 0, progCassa = 0, progKm = 0;
   const progressivi = data.map((d,i)=>{
     progCosto += calcCosto(d);
     progCassa += calcCassa(data, i);
-    return {costo: calcCosto(d), progCosto, cassa: calcCassa(data,i), progCassa};
+    progKm    += n(d.km);
+    return {costo: calcCosto(d), progCosto, cassa: calcCassa(data,i), progCassa, progKm};
   });
 
   // column totals
@@ -773,6 +775,7 @@ function PanoramicaView({data, budget, onOpenDetail}){
               <th title="Costo progressivo">∑Costo</th>
               <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>Cassa g.</th>
               <th title="Cassa progressiva">∑Cassa</th>
+              <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>∑KM</th>
               <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>Budget</th>
             </tr>
           </thead>
@@ -782,6 +785,7 @@ function PanoramicaView({data, budget, onOpenDetail}){
               const pcosto = progressivi[i].progCosto;
               const cassa  = progressivi[i].cassa;
               const pcassa = progressivi[i].progCassa;
+              const pKm    = progressivi[i].progKm;
               const resid  = budgetSeries[i];
               const dow    = d.date ? DAYS_OF_WEEK[new Date(d.date+"T12:00:00").getDay()] : "";
               const isSun  = d.date && new Date(d.date+"T12:00:00").getDay()===0;
@@ -833,6 +837,12 @@ function PanoramicaView({data, budget, onOpenDetail}){
                       €{pcassa%1===0?pcassa:fmt2(pcassa)}
                     </div>
                   </td>
+                  {/* KM progressivi */}
+                  <td style={{borderLeft:"2px solid var(--border2)"}}>
+                    <div className="pan-flow-cell" style={{color:"var(--text2)",fontSize:11}} onClick={()=>onOpenDetail(i)}>
+                      {pKm>0?`${pKm} km`:"—"}
+                    </div>
+                  </td>
                   {/* budget residuo */}
                   <td style={{borderLeft:"2px solid var(--border2)"}}>
                     <div className={`pan-flow-cell ${resid>=0?"budget-pos":"budget-neg"}`} onClick={()=>onOpenDetail(i)}>
@@ -869,6 +879,12 @@ function PanoramicaView({data, budget, onOpenDetail}){
               </td>
               {/* ∑cassa — same */}
               <td><div style={{textAlign:"right",padding:"0 8px",color:"var(--text3)",fontSize:11}}>—</div></td>
+              {/* ∑KM totale */}
+              <td style={{borderLeft:"2px solid var(--border2)"}}>
+                <div style={{textAlign:"right",padding:"0 8px",color:"var(--text2)",fontSize:11}}>
+                  {(progressivi[progressivi.length-1]?.progKm??0)>0?`${progressivi[progressivi.length-1].progKm} km`:""}
+                </div>
+              </td>
               {/* budget finale */}
               <td style={{borderLeft:"2px solid var(--border2)"}}>
                 <div style={{textAlign:"right",padding:"0 8px",
@@ -1243,7 +1259,7 @@ const DAY_SECTIONS = [
   },
 ];
 
-function DayModal({dayIndex, data, budget, onClose, onChange}){
+function DayModal({dayIndex, data, budget, onClose, onChange, consumoMedio, prezzoCarburante}){
   const d   = data[dayIndex];
   const tot = calcCosto(d);
   const pag = calcPagamento(data, dayIndex);
@@ -1304,6 +1320,14 @@ function DayModal({dayIndex, data, budget, onClose, onChange}){
         <div><span>Spesa cassa</span><strong>€ {fmt2(cas)}</strong></div>
         <div><span>Budget residuo</span><strong className={res>=0?"primary":""}style={res<0?{color:"var(--red)"}:{}}>{res>=0?"€ ":"-€"}{fmt2(Math.abs(res))}</strong></div>
         {tpNum!=null && <div><span>Tempo guida</span><strong>{fmtH(tpNum)}</strong></div>}
+        {n(consumoMedio)>0 && n(d.km)>0 && (() => {
+          const litri = n(d.km)*n(consumoMedio)/100;
+          const costo = litri*n(prezzoCarburante);
+          return (<>
+            <div><span>Litri stimati</span><strong style={{color:"var(--accent)"}}>{litri.toFixed(1)} L</strong></div>
+            {n(prezzoCarburante)>0 && <div><span>Costo stimato</span><strong style={{color:"var(--accent)"}}>€{fmt2(costo)}</strong></div>}
+          </>);
+        })()}
       </div>
 
       <div className="btn-row">
@@ -1465,7 +1489,7 @@ function TappaModal({viaggio, onClose, onSave}){
 // ── New / Edit Trip Modal ─────────────────────────────────────────────────
 function TripFormModal({initial, title, onClose, onSave}){
   const today = new Date().toISOString().slice(0,10);
-  const [f,setF] = React.useState(initial || {nome:"",budget:1000,startDate:today,endDate:addDays(today,6)});
+  const [f,setF] = React.useState(initial || {nome:"",budget:1000,startDate:today,endDate:addDays(today,6),veicolo:"",consumoMedio:0,prezzoCarburante:0});
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const giorni = diffInclusive(f.startDate, f.endDate);
   const save=()=>{
@@ -1492,8 +1516,27 @@ function TripFormModal({initial, title, onClose, onSave}){
           <label className="field-label">Rientro</label>
           <input type="date" className="field-input" value={f.endDate} onChange={e=>u("endDate",e.target.value)}/>
         </div>
+        <div className="field" style={{gridColumn:"1/-1"}}>
+          <label className="field-label">⛽ Veicolo (nome/targa)</label>
+          <input type="text" className="field-input" value={f.veicolo||""} onChange={e=>u("veicolo",e.target.value)} placeholder="es. Mobilvetta BP056YC"/>
+        </div>
+        <div className="field">
+          <label className="field-label">Consumo medio (l/100km)</label>
+          <input type="number" className="field-input" value={f.consumoMedio||""} placeholder="es. 12"
+            onFocus={e=>e.target.select()} onChange={e=>u("consumoMedio",+e.target.value||0)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Prezzo carburante €/litro</label>
+          <input type="number" className="field-input" value={f.prezzoCarburante||""} placeholder="es. 1.85"
+            onFocus={e=>e.target.select()} onChange={e=>u("prezzoCarburante",+e.target.value||0)}/>
+        </div>
       </div>
       {giorni>0 && <p style={{marginTop:12,fontSize:12,color:"var(--text2)"}}>⏱ {giorni} giorni · max {MAX_DAYS} giorni supportati</p>}
+      {n(f.consumoMedio)>0 && n(f.prezzoCarburante)>0 && giorni>0 && (
+        <p style={{fontSize:12,color:"var(--accent)",marginTop:6}}>
+          ⛽ Stima carburante viaggio: calcolata dai km per tappa
+        </p>
+      )}
       <div className="btn-row">
         <button className="btn-primary" onClick={save}>✓ Salva</button>
         <button className="btn" onClick={onClose}>Annulla</button>
@@ -1556,7 +1599,11 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
   const editTrip = form => {
     const newPreventivo = buildDays(form.startDate, form.endDate, viaggio.preventivo);
     const newConsuntivo = buildDays(form.startDate, form.endDate, viaggio.consuntivo);
-    updateTrip({...viaggio,...form,budget:n(form.budget),preventivo:newPreventivo,consuntivo:newConsuntivo});
+    updateTrip({...viaggio,...form,budget:n(form.budget),
+      veicolo:form.veicolo||"",
+      consumoMedio:n(form.consumoMedio),
+      prezzoCarburante:n(form.prezzoCarburante),
+      preventivo:newPreventivo,consuntivo:newConsuntivo});
   };
 
   const tappe = (viaggio.tappe||[]).filter(t=>t.target===tab);
@@ -1609,6 +1656,25 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
         {showStats && <StatsPanel data={data} budget={viaggio.budget}/>}
         {showChart && <BudgetChart days={data} budget={viaggio.budget}/>}
 
+        {/* Calcolatore carburante */}
+        {n(viaggio.consumoMedio)>0 && (() => {
+          const kmTot    = data.reduce((a,d)=>a+n(d.km),0);
+          const litri    = kmTot * n(viaggio.consumoMedio) / 100;
+          const costoEst = litri * n(viaggio.prezzoCarburante);
+          const gasolio  = data.reduce((a,d)=>a+n(d.gasolio)+n(d.benzina),0);
+          return (
+            <div className="card-sm" style={{marginBottom:12,display:"flex",flexWrap:"wrap",gap:12,alignItems:"center"}}>
+              <span style={{fontSize:12,color:"var(--text2)"}}>⛽ {viaggio.veicolo||"Veicolo"} · {n(viaggio.consumoMedio)} l/100km</span>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:12}}><span style={{color:"var(--text3)"}}>KM: </span><strong>{kmTot}</strong></span>
+                <span style={{fontSize:12}}><span style={{color:"var(--text3)"}}>Litri stimati: </span><strong style={{color:"var(--accent)"}}>{litri.toFixed(1)}</strong></span>
+                {n(viaggio.prezzoCarburante)>0 && <span style={{fontSize:12}}><span style={{color:"var(--text3)"}}>Costo stimato: </span><strong style={{color:"var(--accent)"}}>€{fmt2(costoEst)}</strong></span>}
+                {gasolio>0 && <span style={{fontSize:12}}><span style={{color:"var(--text3)"}}>Inserito: </span><strong style={{color:"var(--primary)"}}>€{fmt2(gasolio)}</strong></span>}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* View toggle + section header */}
         <div style={{display:"flex",alignItems:"center",gap:10,marginTop:16,marginBottom:8,flexWrap:"wrap"}}>
           <div className="section-title" style={{margin:0,flex:1,minWidth:120}}>
@@ -1646,7 +1712,7 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
       {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip}/>}
       {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
       {fsGrid && <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} fullscreen={true} onToggleFS={()=>setFsGrid(false)} onDayClick={i=>setDayModal(i)}/>}
-      {dayModal!==null && <DayModal dayIndex={dayModal} data={data} budget={viaggio.budget} onClose={()=>setDayModal(null)} onChange={updateCell}/>}
+      {dayModal!==null && <DayModal dayIndex={dayModal} data={data} budget={viaggio.budget} onClose={()=>setDayModal(null)} onChange={updateCell} consumoMedio={n(viaggio.consumoMedio)} prezzoCarburante={n(viaggio.prezzoCarburante)}/>}
     </div>
   );
 }
@@ -1892,7 +1958,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.2</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.3</span></div>
         <div className="header-actions">
           <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
