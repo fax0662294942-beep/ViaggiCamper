@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v6.3</title>
+<title>🚐 Viaggi Camper v6.4</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -410,8 +410,9 @@ window.addEventListener("popstate", function(){
     // Home screen: double-back to exit
     const now = Date.now();
     if(now - _lastBackTime < 2200){
-      // Remove our extra state and actually go back to exit
-      window.history.go(-2);
+      // Try to close/exit — on Android PWA go back past all our injected states
+      window.history.go(-window.history.length);
+      setTimeout(()=>window.close(), 100);
     } else {
       _lastBackTime = now;
       _showToast("🔙 Premi ancora per uscire");
@@ -711,6 +712,7 @@ const PAN_COLS = [
   {key:"extraStruttura", label:"Extra str.", cat:"struttura", abbr:"X-str"},
   // viaggio group
   {key:"km",             label:"KM",        cat:"km",        abbr:"KM",  isKm:true},
+  {key:"__progkm__",     label:"∑KM prog.", cat:"km",        abbr:"∑KM", isProgKm:true},
   {key:"benzina",        label:"Benzina",   cat:"viaggio",   abbr:"Benz"},
   {key:"gasolio",        label:"Gasolio",   cat:"viaggio",   abbr:"Gas"},
   {key:"pedaggi",        label:"Pedaggi",   cat:"viaggio",   abbr:"Ped"},
@@ -736,10 +738,23 @@ function PanoramicaView({data, budget, onOpenDetail}){
     return {costo: calcCosto(d), progCosto, cassa: calcCassa(data,i), progCassa, progKm};
   });
 
-  // column totals
-  const colTotals = PAN_COLS.reduce((acc,c)=>({...acc,[c.key]:data.reduce((a,d)=>a+n(d[c.key]),0)}), {});
+  // column totals (skip virtual cols)
+  const colTotals = PAN_COLS.reduce((acc,c)=>c.isProgKm?acc:({...acc,[c.key]:data.reduce((a,d)=>a+n(d[c.key]),0)}), {});
 
   const amtCell = (d, col, i) => {
+    if(col.isProgKm){
+      const pkm = progressivi[i].progKm;
+      return (
+        <td key={col.key} style={{borderLeft:"1px solid var(--border)"}}>
+          <div className={`pan-amt cat-km${pkm>0?" has-val":""}`}
+            style={{color:"var(--text2)",fontSize:11}}
+            onClick={()=>onOpenDetail(i)}
+            title={`KM progressivi: ${pkm} km`}>
+            {pkm>0?pkm:"·"}
+          </div>
+        </td>
+      );
+    }
     const v = n(d[col.key]);
     const hasVal = v > 0;
     const display = col.isKm
@@ -775,7 +790,6 @@ function PanoramicaView({data, budget, onOpenDetail}){
               <th title="Costo progressivo">∑Costo</th>
               <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>Cassa g.</th>
               <th title="Cassa progressiva">∑Cassa</th>
-              <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>∑KM</th>
               <th className="th-group-sep" style={{borderLeft:"2px solid var(--border2)"}}>Budget</th>
             </tr>
           </thead>
@@ -837,12 +851,6 @@ function PanoramicaView({data, budget, onOpenDetail}){
                       €{pcassa%1===0?pcassa:fmt2(pcassa)}
                     </div>
                   </td>
-                  {/* KM progressivi */}
-                  <td style={{borderLeft:"2px solid var(--border2)"}}>
-                    <div className="pan-flow-cell" style={{color:"var(--text2)",fontSize:11}} onClick={()=>onOpenDetail(i)}>
-                      {pKm>0?`${pKm} km`:"—"}
-                    </div>
-                  </td>
                   {/* budget residuo */}
                   <td style={{borderLeft:"2px solid var(--border2)"}}>
                     <div className={`pan-flow-cell ${resid>=0?"budget-pos":"budget-neg"}`} onClick={()=>onOpenDetail(i)}>
@@ -857,9 +865,11 @@ function PanoramicaView({data, budget, onOpenDetail}){
             <tr>
               <td className="sticky-col">Totali</td>
               {PAN_COLS.map(c=>(
-                <td key={c.key} style={{borderLeft: c.key==="km"||c.key==="spesa"?"2px solid var(--border2)":undefined}}>
+                <td key={c.key} style={{borderLeft: c.key==="km"||c.key==="spesa"?"2px solid var(--border2)":c.isProgKm?"1px solid var(--border)":undefined}}>
                   <div style={{textAlign:"center",padding:"0 4px",fontSize:11,color:"var(--text2)"}}>
-                    {colTotals[c.key]>0 ? (c.isKm?colTotals[c.key]:fmt2(colTotals[c.key])) : ""}
+                    {c.isProgKm
+                      ? ((progressivi[progressivi.length-1]?.progKm??0)>0 ? `${progressivi[progressivi.length-1].progKm}` : "")
+                      : colTotals[c.key]>0 ? (c.isKm?colTotals[c.key]:fmt2(colTotals[c.key])) : ""}
                   </div>
                 </td>
               ))}
@@ -879,12 +889,6 @@ function PanoramicaView({data, budget, onOpenDetail}){
               </td>
               {/* ∑cassa — same */}
               <td><div style={{textAlign:"right",padding:"0 8px",color:"var(--text3)",fontSize:11}}>—</div></td>
-              {/* ∑KM totale */}
-              <td style={{borderLeft:"2px solid var(--border2)"}}>
-                <div style={{textAlign:"right",padding:"0 8px",color:"var(--text2)",fontSize:11}}>
-                  {(progressivi[progressivi.length-1]?.progKm??0)>0?`${progressivi[progressivi.length-1].progKm} km`:""}
-                </div>
-              </td>
               {/* budget finale */}
               <td style={{borderLeft:"2px solid var(--border2)"}}>
                 <div style={{textAlign:"right",padding:"0 8px",
@@ -1431,18 +1435,38 @@ function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget}){
 
 // ── Tappa Modal ────────────────────────────────────────────────────────────
 function TappaModal({viaggio, onClose, onSave}){
+  const consumoMedio = n(viaggio.consumoMedio);
   const [f,setF] = React.useState({
     startDate:viaggio.startDate, endDate:addDays(viaggio.startDate,1),
     luogo:"", struttura:"",
     costoPiazzola:0, costoPersona:0, numeroPersone:2,
     elettricita:0, moto:0, tassaSoggiorno:0, extraStruttura:0,
-    budgetAllocato:0
+    budgetAllocato:0,
+    kmTappa:0, prezzoLitro:0, costoCarburante:0
   });
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const notti = Math.max(0, diffInclusive(f.startDate, f.endDate)-1);
   const perNotte = n(f.costoPiazzola)+n(f.costoPersona)*n(f.numeroPersone)+n(f.elettricita)+n(f.moto);
   const tassaN   = n(f.tassaSoggiorno)*n(f.numeroPersone);
   const totale   = (perNotte+tassaN)*notti;
+  const litriStimati = consumoMedio>0 && n(f.kmTappa)>0 ? n(f.kmTappa)*consumoMedio/100 : 0;
+  const costoStimato = litriStimati>0 && n(f.prezzoLitro)>0 ? litriStimati*n(f.prezzoLitro) : 0;
+
+  // Auto-suggest costoCarburante when it changes
+  const onPrezzoLitro = v => {
+    u("prezzoLitro", v);
+    if(litriStimati>0 && v>0){
+      const sug = litriStimati * v;
+      setF(p=>({...p, prezzoLitro:v, costoCarburante:Math.ceil(sug)}));
+    }
+  };
+  const onKmChange = v => {
+    u("kmTappa", v);
+    if(n(f.prezzoLitro)>0 && consumoMedio>0 && v>0){
+      const lit = v*consumoMedio/100;
+      setF(p=>({...p, kmTappa:v, costoCarburante:Math.ceil(lit*n(p.prezzoLitro))}));
+    }
+  };
 
   return (
     <Modal title="Nuova tappa" onClose={onClose} width="640px">
@@ -1472,11 +1496,51 @@ function TappaModal({viaggio, onClose, onSave}){
         <NumField label="Extra struttura €/notte"       value={f.extraStruttura}   onChange={v=>u("extraStruttura",v)}/>
         <NumField label="Budget allocato € (opzionale)" value={f.budgetAllocato}   onChange={v=>u("budgetAllocato",v)} placeholder="0 = non definito"/>
       </div>
-      <div className="tappa-summary">
+
+      {/* Sezione carburante */}
+      <div style={{marginTop:16}}>
+        <div className="section-title" style={{marginBottom:10}}>⛽ Carburante per questa tappa</div>
+        <div className="form-grid" style={{gap:10}}>
+          <div className="field">
+            <label className="field-label">KM da percorrere</label>
+            <input type="number" className="field-input" value={f.kmTappa||""} placeholder="es. 250"
+              onFocus={e=>e.target.select()} onChange={e=>onKmChange(+e.target.value||0)}/>
+          </div>
+          <div className="field">
+            <label className="field-label">Prezzo diesel €/litro</label>
+            <input type="number" className="field-input" value={f.prezzoLitro||""} placeholder="es. 1.72"
+              onFocus={e=>e.target.select()} onChange={e=>onPrezzoLitro(+e.target.value||0)}/>
+          </div>
+        </div>
+        {litriStimati>0 && (
+          <div className="tappa-summary" style={{marginTop:10}}>
+            {consumoMedio>0 && <div><span>Consumo</span><strong>{consumoMedio} l/100km</strong></div>}
+            <div><span>KM tappa</span><strong style={{color:"var(--text)"}}>{n(f.kmTappa)} km</strong></div>
+            <div><span>Litri stimati</span><strong style={{color:"var(--accent)"}}>{litriStimati.toFixed(1)} L</strong></div>
+            {costoStimato>0 && <div><span>Costo stimato</span><strong style={{color:"var(--accent)"}}>€{fmt2(costoStimato)}</strong></div>}
+          </div>
+        )}
+        {costoStimato>0 && (
+          <div className="field" style={{marginTop:10}}>
+            <label className="field-label">💳 Importo da inserire in tabella (modificabile)</label>
+            <input type="number" className="field-input"
+              value={f.costoCarburante||""}
+              placeholder={fmt2(costoStimato)}
+              onFocus={e=>e.target.select()}
+              onChange={e=>u("costoCarburante",+e.target.value||0)}
+              style={{fontSize:16,fontWeight:700,color:"var(--primary)"}}/>
+            <span style={{fontSize:11,color:"var(--text3)",marginTop:4,display:"block"}}>
+              Suggerito: €{fmt2(costoStimato)} · puoi arrotondare o modificare
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="tappa-summary" style={{marginTop:12}}>
         <div><span>Notti</span><strong className="primary">{notti}</strong></div>
         <div><span>Piazzola/notte</span><strong>€ {fmt2(perNotte)}</strong></div>
         <div><span>Tassa/notte</span><strong>€ {fmt2(tassaN)}</strong></div>
-        <div><span>Totale stimato</span><strong className="accent">€ {fmt2(totale)}</strong></div>
+        <div><span>Totale struttura</span><strong className="accent">€ {fmt2(totale)}</strong></div>
       </div>
       <div className="btn-row">
         <button className="btn-primary" onClick={()=>onSave(f)}>✓ Salva tappa</button>
@@ -1520,23 +1584,13 @@ function TripFormModal({initial, title, onClose, onSave}){
           <label className="field-label">⛽ Veicolo (nome/targa)</label>
           <input type="text" className="field-input" value={f.veicolo||""} onChange={e=>u("veicolo",e.target.value)} placeholder="es. Mobilvetta BP056YC"/>
         </div>
-        <div className="field">
+        <div className="field" style={{gridColumn:"1/-1"}}>
           <label className="field-label">Consumo medio (l/100km)</label>
           <input type="number" className="field-input" value={f.consumoMedio||""} placeholder="es. 12"
             onFocus={e=>e.target.select()} onChange={e=>u("consumoMedio",+e.target.value||0)}/>
         </div>
-        <div className="field">
-          <label className="field-label">Prezzo carburante €/litro</label>
-          <input type="number" className="field-input" value={f.prezzoCarburante||""} placeholder="es. 1.85"
-            onFocus={e=>e.target.select()} onChange={e=>u("prezzoCarburante",+e.target.value||0)}/>
-        </div>
       </div>
       {giorni>0 && <p style={{marginTop:12,fontSize:12,color:"var(--text2)"}}>⏱ {giorni} giorni · max {MAX_DAYS} giorni supportati</p>}
-      {n(f.consumoMedio)>0 && n(f.prezzoCarburante)>0 && giorni>0 && (
-        <p style={{fontSize:12,color:"var(--accent)",marginTop:6}}>
-          ⛽ Stima carburante viaggio: calcolata dai km per tappa
-        </p>
-      )}
       <div className="btn-row">
         <button className="btn-primary" onClick={save}>✓ Salva</button>
         <button className="btn" onClick={onClose}>Annulla</button>
@@ -1580,6 +1634,13 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
       copy[tab][i]={...copy[tab][i],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,extraStruttura:n(form.extraStruttura)};
     }
     copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,extraStruttura:0};
+    // Km e carburante → primo giorno della tappa
+    if(n(form.kmTappa)>0){
+      copy[tab][sIdx]={...copy[tab][sIdx], km:n(form.kmTappa)};
+    }
+    if(n(form.costoCarburante)>0){
+      copy[tab][sIdx]={...copy[tab][sIdx], gasolio:n(form.costoCarburante)};
+    }
     copy.tappe.push({...form,id:Date.now(),target:tab,idTappa:idT});
     updateTrip(copy);
     setTappa(false);
@@ -1958,7 +2019,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.3</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.4</span></div>
         <div className="header-actions">
           <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
