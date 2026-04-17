@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v6.0</title>
+<title>🚐 Viaggi Camper v6.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1562,26 +1562,29 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
 
   return (
     <div>
-      <div className="app-header">
-        <div className="flex" style={{gap:12,minWidth:0}}>
-          <button className="btn-icon" onClick={back} title="Torna alla lista">←</button>
-          <div>
-            <div className="logo" style={{fontSize:15}}>{viaggio.nome}</div>
-            <div style={{fontSize:11,color:"var(--text2)",marginTop:2}}>
-              {fmtDate(viaggio.startDate)} → {fmtDate(viaggio.endDate)} · {data.length} giorni
-              &nbsp;·&nbsp;
-              <span style={{color:"var(--primary)",fontWeight:600}}>Budget € {fmt2(n(viaggio.budget))}</span>
+      <div className="app-header" style={{height:"auto",flexDirection:"column",alignItems:"stretch",padding:"8px 12px",gap:6}}>
+        {/* Row 1: back + title */}
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          <button className="btn-icon" onClick={back} title="Torna alla lista" style={{flexShrink:0}}>←</button>
+          <div style={{minWidth:0,flex:1,overflow:"hidden"}}>
+            <div className="logo" style={{fontSize:14,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{viaggio.nome}</div>
+            <div style={{fontSize:10,color:"var(--text2)"}}>
+              {fmtDate(viaggio.startDate)} → {fmtDate(viaggio.endDate)} · {data.length}g
+              &nbsp;·&nbsp;<span style={{color:"var(--primary)",fontWeight:600}}>€{fmt2(n(viaggio.budget))}</span>
             </div>
           </div>
         </div>
-        <div className="header-actions">
-          <button className={`btn-tab ${tab==="preventivo"?"active":""}`} onClick={()=>setTab("preventivo")}>Preventivo</button>
-          <button className={`btn-tab ${tab==="consuntivo"?"active":""}`} onClick={()=>setTab("consuntivo")}>Consuntivo</button>
-          <button className="btn-icon no-print" onClick={()=>setTappa(true)} title="Aggiungi tappa">＋ Tappa</button>
-          <button className="btn-icon no-print" onClick={()=>exportCSV(viaggio,tab)} title="Esporta CSV">CSV</button>
-          <button className="btn-icon no-print" onClick={()=>window.print()} title="Stampa">🖨</button>
-          {onShare && <button className="btn-icon no-print" onClick={onShare} title="Condividi viaggio">👥</button>}
-          <button className="btn-icon no-print" onClick={()=>setEdit(true)} title="Modifica viaggio">✏️</button>
+        {/* Row 2: tabs + actions */}
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"nowrap",overflowX:"auto",paddingBottom:2}}>
+          <button className={`btn-tab ${tab==="preventivo"?"active":""}`} onClick={()=>setTab("preventivo")} style={{flexShrink:0,padding:"5px 10px",fontSize:12}}>Preventivo</button>
+          <button className={`btn-tab ${tab==="consuntivo"?"active":""}`} onClick={()=>setTab("consuntivo")} style={{flexShrink:0,padding:"5px 10px",fontSize:12}}>Consuntivo</button>
+          <div style={{marginLeft:"auto",display:"flex",gap:5,flexShrink:0}}>
+            <button className="btn-icon no-print" onClick={()=>setTappa(true)} title="Aggiungi tappa" style={{padding:"5px 8px",fontSize:12}}>＋ Tappa</button>
+            <button className="btn-icon no-print" onClick={()=>exportCSV(viaggio,tab)} title="Esporta CSV" style={{padding:"5px 8px",fontSize:11}}>CSV</button>
+            <button className="btn-icon no-print" onClick={()=>window.print()} title="Stampa" style={{padding:"5px 8px"}}>🖨</button>
+            {onShare && <button className="btn-icon no-print" onClick={onShare} title="Condividi" style={{padding:"5px 8px"}}>👥</button>}
+            <button className="btn-icon no-print" onClick={()=>setEdit(true)} title="Modifica" style={{padding:"5px 8px"}}>✏️</button>
+          </div>
         </div>
       </div>
 
@@ -1888,7 +1891,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.0</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.1</span></div>
         <div className="header-actions">
           <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
