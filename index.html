@@ -3,15 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v6.1</title>
-<link rel="manifest" href="manifest.json"/>
-<meta name="theme-color" content="#0c1210"/>
-<meta name="description" content="Pianifica e traccia le spese dei tuoi viaggi in camper"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Viaggi Camper"/>
-<link rel="apple-touch-icon" href="icon-192.png"/>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}</script>
+<title>🚐 Viaggi Camper v6.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -511,10 +503,11 @@ const calcPagamento = (days,idx) => {
   const d=days[idx]; if(!d) return 0;
   if(!d.idTappa) return n(d.pagamentoManual);
   const prev=days[idx-1];
-  // Checkout = stesso idTappa del giorno prima, ma piazzola e tassa azzerate
-  const isChk = prev && prev.idTappa===d.idTappa && n(d.piazzola)===0 && n(d.tassa)===0;
-  if(isChk){
-    // Somma SOLO piazzola+tassa (gli extra si pagano giorno per giorno)
+  const next=days[idx+1];
+  // Pagamento sull'ULTIMO giorno consecutivo della tappa:
+  // funziona anche quando il giorno di checkout viene sovrascritto dalla tappa successiva
+  const isLastDay = prev?.idTappa===d.idTappa && next?.idTappa!==d.idTappa;
+  if(isLastDay){
     const sum=days.reduce((a,x)=>x.idTappa===d.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
     return n(d.pagamentoManual!==""?d.pagamentoManual:sum);
   }
@@ -1899,7 +1892,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.1</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.2</span></div>
         <div className="header-actions">
           <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
