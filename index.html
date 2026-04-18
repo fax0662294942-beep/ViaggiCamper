@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v7.0</title>
+<title>🚐 CamperHub v7.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -2759,7 +2759,8 @@ function App(){
   const [dispensa,setDispensa] = React.useState(null);
   const [dispId,setDispId]     = React.useState(null);
   const [activeId,setActiveId] = React.useState(null);
-  const [showDisp,setShowDisp] = React.useState(false);
+  const [showDisp,setShowDisp]   = React.useState(false);
+  const [showViaggi,setShowViaggi] = React.useState(false);
   const [showNew,setNew]       = React.useState(false);
   const [delId,setDel]         = React.useState(null);
   const [showShare,setShare]   = React.useState(null);
@@ -2844,60 +2845,25 @@ function App(){
     return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)}/>;
   }
 
-  // Home
-  const dispStats = dispensa ? {
-    tot:(dispensa.products||[]).filter(p=>!p.disabled).length,
-    low:(dispensa.products||[]).filter(p=>!p.disabled&&p.status==='low').length,
-    out:(dispensa.products||[]).filter(p=>!p.disabled&&p.status==='out').length,
-    buy:(dispensa.products||[]).filter(p=>!p.disabled&&p.toBuy).length,
-  } : null;
-
-  return(
+  // Viaggi section
+  if(showViaggi) return(
     <div>
-      <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.0</span></div>
-        <div className="header-actions">
-          <button className="btn-primary" onClick={()=>setNew(true)}>＋ Viaggio</button>
+      <div className="app-header" style={{height:'auto',flexDirection:'column',alignItems:'stretch',padding:'8px 12px',gap:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="btn-icon" onClick={()=>setShowViaggi(false)} style={{flexShrink:0}}>←</button>
+          <div className="logo" style={{fontSize:15,flex:1}}>✈️ <strong>I miei viaggi</strong></div>
+          <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setNew(true)}>＋ Nuovo</button>
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
         </div>
       </div>
-
       <div className="container">
-        <div style={{fontSize:11,color:'var(--text3)',marginBottom:12,display:'flex',alignItems:'center',gap:6}}>
-          <span>👤</span><span>{user.email}</span>
-        </div>
-
-        {/* Card Dispensa */}
-        <div className="ds-hub-card" onClick={()=>setShowDisp(true)}>
-          <div style={{fontSize:32,flexShrink:0}}>🎒</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:700,color:'var(--primary)',fontFamily:"'Syne',sans-serif"}}>Dispensa Camper</div>
-            {dispStats
-              ? <div style={{fontSize:12,color:'var(--text2)',marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
-                  <span>{dispStats.tot} prodotti</span>
-                  {dispStats.low>0&&<span style={{color:'var(--accent)'}}>⚠️ {dispStats.low} scarsi</span>}
-                  {dispStats.out>0&&<span style={{color:'var(--red)'}}>❌ {dispStats.out} mancanti</span>}
-                  {dispStats.buy>0&&<span style={{color:'var(--primary)'}}>🛒 {dispStats.buy} da comprare</span>}
-                </div>
-              : <div style={{fontSize:12,color:'var(--text3)'}}>Caricamento...</div>
-            }
-          </div>
-          <span style={{color:'var(--text3)',fontSize:22}}>›</span>
-        </div>
-
-        {/* Viaggi */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-          <div style={{fontSize:11,color:'var(--text3)',fontWeight:600,letterSpacing:.5}}>✈️ I MIEI VIAGGI</div>
-        </div>
-
         {viaggi.length===0&&(
-          <div className="empty" style={{paddingTop:40}}>
+          <div className="empty" style={{paddingTop:60}}>
             <div className="empty-icon">🚐</div>
             <p style={{marginBottom:16,color:'var(--text2)'}}>Nessun viaggio ancora. Crea il tuo primo!</p>
             <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
           </div>
         )}
-
         <div className="trips-grid">
           {viaggi.map(v=>{
             const giorni=diffInclusive(v.startDate,v.endDate);
@@ -2934,10 +2900,66 @@ function App(){
           </div>
         </div>
       </div>
-
       {showNew&&<TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
       {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`} onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
       {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
+    </div>
+  );
+
+  // Home — due card
+  const dispStats = dispensa ? {
+    tot:(dispensa.products||[]).filter(p=>!p.disabled).length,
+    low:(dispensa.products||[]).filter(p=>!p.disabled&&p.status==='low').length,
+    out:(dispensa.products||[]).filter(p=>!p.disabled&&p.status==='out').length,
+    buy:(dispensa.products||[]).filter(p=>!p.disabled&&p.toBuy).length,
+  } : null;
+
+  return(
+    <div>
+      <div className="app-header">
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.2</span></div>
+        <div className="header-actions">
+          <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
+        </div>
+      </div>
+
+      <div className="container">
+        <div style={{fontSize:11,color:'var(--text3)',marginBottom:20,display:'flex',alignItems:'center',gap:6}}>
+          <span>👤</span><span>{user.email}</span>
+        </div>
+
+        {/* Card Viaggi */}
+        <div className="ds-hub-card" onClick={()=>setShowViaggi(true)}
+          style={{borderColor: viaggi.length>0 ? 'var(--primary-dim)' : 'var(--border2)'}}>
+          <div style={{fontSize:36,flexShrink:0}}>🚐</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:16,fontWeight:700,color:'var(--primary)',fontFamily:"'Syne',sans-serif"}}>I miei viaggi</div>
+            <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>
+              {viaggi.length===0 ? 'Nessun viaggio — creane uno!' : `${viaggi.length} ${viaggi.length===1?'viaggio':'viaggi'} in archivio`}
+            </div>
+          </div>
+          <span style={{color:'var(--text3)',fontSize:22}}>›</span>
+        </div>
+
+        {/* Card Dispensa */}
+        <div className="ds-hub-card" onClick={()=>setShowDisp(true)}>
+          <div style={{fontSize:36,flexShrink:0}}>🎒</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:16,fontWeight:700,color:'var(--primary)',fontFamily:"'Syne',sans-serif"}}>Dispensa Camper</div>
+            {dispStats
+              ? <div style={{fontSize:12,color:'var(--text2)',marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <span>{dispStats.tot} prodotti</span>
+                  {dispStats.low>0&&<span style={{color:'var(--accent)'}}>⚠️ {dispStats.low} scarsi</span>}
+                  {dispStats.out>0&&<span style={{color:'var(--red)'}}>❌ {dispStats.out} mancanti</span>}
+                  {dispStats.buy>0&&<span style={{color:'var(--primary)'}}>🛒 {dispStats.buy} da comprare</span>}
+                </div>
+              : <div style={{fontSize:12,color:'var(--text3)'}}>Caricamento...</div>
+            }
+          </div>
+          <span style={{color:'var(--text3)',fontSize:22}}>›</span>
+        </div>
+
+      </div>
     </div>
   );
 }
