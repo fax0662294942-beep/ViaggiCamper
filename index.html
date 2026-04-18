@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v7.7</title>
+<title>🚐 CamperHub v7.8</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1732,7 +1732,7 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
 }
 
 // ── Trip View ──────────────────────────────────────────────────────────────
-function TripView({viaggio, updateTrip, back, user, onShare}){
+function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}){
   useBack(back);
   const [tab, setTab]           = React.useState("preventivo");
   const [showTappa, setTappa]   = React.useState(false);
@@ -1971,7 +1971,7 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
 
       {showTappa && <TappaModal viaggio={viaggio} onClose={()=>setTappa(false)} onSave={addTappa}/>}
       {editingTappa && <TappaModal viaggio={viaggio} initial={editingTappa} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
-      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={[]}/>}
+      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={gruppiEsistenti}/>}
       {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
       {fsGrid && <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} fullscreen={true} onToggleFS={()=>setFsGrid(false)} onDayClick={i=>setDayModal(i)}/>}
       {dayModal!==null && <DayModal dayIndex={dayModal} data={data} budget={viaggio.budget} onClose={()=>setDayModal(null)} onChange={updateCell} consumoMedio={n(viaggio.consumoMedio)} prezzoCarburante={n(viaggio.prezzoCarburante)}/>}
@@ -2951,7 +2951,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         {/* Riga 1: titolo e condividi */}
         <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:8}}>
           <button className="btn-icon" onClick={onBack} style={{flexShrink:0}}>←</button>
-          <div className="logo" style={{fontSize:15,flex:1}}>🎒 <strong>Dispensa Camper</strong></div>
+          <div className="logo" style={{fontSize:15,flex:1}}>🏕️ <strong>Dispensa Camper</strong></div>
           <button className="btn-icon" onClick={()=>setShowShare(true)} title="Condividi" style={{flexShrink:0}}>👥</button>
         </div>
         {/* Riga 2: tab con icona sopra e testo sotto */}
@@ -3074,7 +3074,8 @@ function App(){
   if(activeId){
     const v=viaggi.find(x=>x.id===activeId);
     if(!v){ setActiveId(null); return null; }
-    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)}/>;
+    const gruppiEsistenti = [...new Set(viaggi.map(v=>(v.gruppo||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'));
+    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)} gruppiEsistenti={gruppiEsistenti}/>;
   }
 
   // Viaggi section
@@ -3101,7 +3102,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.7</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.8</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
         </div>
@@ -3127,7 +3128,7 @@ function App(){
 
         {/* Card Dispensa */}
         <div className="ds-hub-card" onClick={()=>setShowDisp(true)}>
-          <div style={{fontSize:36,flexShrink:0}}>🎒</div>
+          <div style={{fontSize:36,flexShrink:0}}>🏕️</div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:16,fontWeight:700,color:'var(--primary)',fontFamily:"'Syne',sans-serif"}}>Dispensa Camper</div>
             {dispStats
