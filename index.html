@@ -388,6 +388,14 @@ th.th-group-sep{border-left:2px solid var(--border2)!important}
 .ds-hub-card{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:14px 16px;margin-bottom:16px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .15s}
 .ds-hub-card:active{border-color:var(--primary-dim)}
 </style>
+<script>
+// Sblocca rotazione schermo nell'APK
+try {
+  if(screen.orientation && screen.orientation.unlock) {
+    screen.orientation.unlock();
+  }
+} catch(e){}
+</script>
 </head>
 <body>
 <div id="root"></div>
