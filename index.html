@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v7.8</title>
+<title>🚐 CamperHub v7.9</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -2167,7 +2167,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
   });
   const years = Object.keys(byYear).sort((a,b)=>b-a);
   const isExpY = y   => expandedY[y]!==false;           // anni: default espanso
-  const isExpG = key => expandedG[key]!==false;          // gruppi: default espanso
+  const isExpG = key => expandedG[key]===true;           // gruppi: default collasso
   const togY   = y   => setExpandedY(p=>({...p,[y]:!isExpY(y)}));
   const togG   = key => setExpandedG(p=>({...p,[key]:!isExpG(key)}));
 
@@ -3102,7 +3102,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.8</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.9</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
         </div>
