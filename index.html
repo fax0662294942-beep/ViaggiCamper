@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v7.2</title>
+<title>🚐 CamperHub v7.3</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -2084,6 +2084,70 @@ function ShareModal({viaggio, user, onClose}){
   );
 }
 
+// ── Viaggi Section ───────────────────────────────────────────────────────
+function ViaggiaSection({viaggi, onBack, onOpen, onNew, onShare, onDelete, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip}){
+  useBack(onBack);
+  return(
+    <div>
+      <div className="app-header" style={{height:'auto',flexDirection:'column',alignItems:'stretch',padding:'8px 12px',gap:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="btn-icon" onClick={onBack} style={{flexShrink:0}}>←</button>
+          <div className="logo" style={{fontSize:15,flex:1}}>✈️ <strong>I miei viaggi</strong></div>
+          <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setNew(true)}>＋ Nuovo</button>
+          <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
+        </div>
+      </div>
+      <div className="container">
+        {viaggi.length===0&&(
+          <div className="empty" style={{paddingTop:60}}>
+            <div className="empty-icon">🚐</div>
+            <p style={{marginBottom:16,color:'var(--text2)'}}>Nessun viaggio ancora. Crea il tuo primo!</p>
+            <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
+          </div>
+        )}
+        <div className="trips-grid">
+          {viaggi.map(v=>{
+            const giorni=diffInclusive(v.startDate,v.endDate);
+            const stats=getStats(v.consuntivo||[], v.budget);
+            const hasData=(v.consuntivo||[]).some(d=>calcCosto(d)>0);
+            const isShared=(v.members||[]).length>1;
+            return(
+              <div key={v.id} className="trip-card" onClick={()=>onOpen(v.id)}>
+                <div className="trip-card-name">
+                  {v.nome}
+                  {isShared&&<span className="badge accent" style={{fontSize:10,marginLeft:6}}>👥</span>}
+                </div>
+                <div className="trip-card-meta">
+                  <span>📅 {fmtDate(v.startDate)} → {fmtDate(v.endDate)}</span>
+                  <span>⏱ {giorni} giorni · {(v.tappe||[]).length} tappe</span>
+                </div>
+                <div className="trip-card-budget">
+                  <strong>{fmt2(n(v.budget))}</strong>
+                  <span style={{fontSize:12,color:'var(--text2)'}}>budget iniziale</span>
+                  {hasData&&<span style={{fontSize:12,color:stats.residuo>=0?'var(--green)':'var(--red)',marginLeft:'auto'}}>
+                    residuo: €{fmt2(stats.residuo)}
+                  </span>}
+                </div>
+                <div className="trip-card-actions" onClick={e=>e.stopPropagation()}>
+                  <button className="btn-icon btn-sm" onClick={()=>onOpen(v.id)}>✏️ Apri</button>
+                  <button className="btn-icon btn-sm" style={{color:'var(--primary)'}} onClick={()=>setShare(v)} title="Condividi">👥</button>
+                  {v.ownerId===user.uid&&<button className="btn-icon btn-sm" style={{color:'var(--red)'}} onClick={()=>setDel(v.id)}>🗑</button>}
+                </div>
+              </div>
+            );
+          })}
+          <div className="trip-card new-card" onClick={()=>setNew(true)} role="button">
+            <span style={{fontSize:24}}>＋</span><span>Nuovo viaggio</span>
+          </div>
+        </div>
+      </div>
+      {showNew&&<TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
+      {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`} onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
+      {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
+    </div>
+  );
+}
+
 // ── Dispensa Share Modal ─────────────────────────────────────────────────
 function DispensaShareModal({dispensa, dispensaId, user, onClose}){
   const [email,setEmail]=React.useState('');
@@ -2847,63 +2911,16 @@ function App(){
 
   // Viaggi section
   if(showViaggi) return(
-    <div>
-      <div className="app-header" style={{height:'auto',flexDirection:'column',alignItems:'stretch',padding:'8px 12px',gap:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <button className="btn-icon" onClick={()=>setShowViaggi(false)} style={{flexShrink:0}}>←</button>
-          <div className="logo" style={{fontSize:15,flex:1}}>✈️ <strong>I miei viaggi</strong></div>
-          <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setNew(true)}>＋ Nuovo</button>
-          <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
-        </div>
-      </div>
-      <div className="container">
-        {viaggi.length===0&&(
-          <div className="empty" style={{paddingTop:60}}>
-            <div className="empty-icon">🚐</div>
-            <p style={{marginBottom:16,color:'var(--text2)'}}>Nessun viaggio ancora. Crea il tuo primo!</p>
-            <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
-          </div>
-        )}
-        <div className="trips-grid">
-          {viaggi.map(v=>{
-            const giorni=diffInclusive(v.startDate,v.endDate);
-            const stats=getStats(v.consuntivo||[], v.budget);
-            const hasData=(v.consuntivo||[]).some(d=>calcCosto(d)>0);
-            const isShared=(v.members||[]).length>1;
-            return(
-              <div key={v.id} className="trip-card" onClick={()=>setActiveId(v.id)}>
-                <div className="trip-card-name">
-                  {v.nome}
-                  {isShared&&<span className="badge accent" style={{fontSize:10,marginLeft:6}}>👥</span>}
-                </div>
-                <div className="trip-card-meta">
-                  <span>📅 {fmtDate(v.startDate)} → {fmtDate(v.endDate)}</span>
-                  <span>⏱ {giorni} giorni · {(v.tappe||[]).length} tappe</span>
-                </div>
-                <div className="trip-card-budget">
-                  <strong>{fmt2(n(v.budget))}</strong>
-                  <span style={{fontSize:12,color:'var(--text2)'}}>budget iniziale</span>
-                  {hasData&&<span style={{fontSize:12,color:stats.residuo>=0?'var(--green)':'var(--red)',marginLeft:'auto'}}>
-                    residuo: €{fmt2(stats.residuo)}
-                  </span>}
-                </div>
-                <div className="trip-card-actions" onClick={e=>e.stopPropagation()}>
-                  <button className="btn-icon btn-sm" onClick={()=>setActiveId(v.id)}>✏️ Apri</button>
-                  <button className="btn-icon btn-sm" style={{color:'var(--primary)'}} onClick={()=>setShare(v)} title="Condividi">👥</button>
-                  {v.ownerId===user.uid&&<button className="btn-icon btn-sm" style={{color:'var(--red)'}} onClick={()=>setDel(v.id)}>🗑</button>}
-                </div>
-              </div>
-            );
-          })}
-          <div className="trip-card new-card" onClick={()=>setNew(true)} role="button">
-            <span style={{fontSize:24}}>＋</span><span>Nuovo viaggio</span>
-          </div>
-        </div>
-      </div>
-      {showNew&&<TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
-      {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`} onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
-      {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
-    </div>
+    <ViaggiaSection
+      viaggi={viaggi} user={user} signOut={signOut}
+      onBack={()=>setShowViaggi(false)}
+      onOpen={id=>setActiveId(id)}
+      onNew={()=>setNew(true)}
+      showNew={showNew} setNew={setNew}
+      delId={delId} setDel={setDel}
+      showShare={showShare} setShare={setShare}
+      addTrip={addTrip} removeTrip={removeTrip}
+    />
   );
 
   // Home — due card
@@ -2917,7 +2934,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.2</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.3</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
         </div>
