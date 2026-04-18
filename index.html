@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v6.4</title>
+<title>🚐 Viaggi Camper v6.7</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -503,17 +503,15 @@ const GROUP_COLS = {struttura:["--col-s0","--col-s1"], viaggio:["--col-v0","--co
 // ── Calcs ──────────────────────────────────────────────────────────────────
 const calcPagamento = (days,idx) => {
   const d=days[idx]; if(!d) return 0;
-  if(!d.idTappa) return n(d.pagamentoManual);
+  const base = n(d.pagamentoCheckoutPrev||0); // checkout tappa precedente sullo stesso giorno
+  if(!d.idTappa) return base + n(d.pagamentoManual);
   const next=days[idx+1];
-  // Pagamento sull'ultimo giorno con questo idTappa
-  // (il giorno successivo ha idTappa diverso, o non esiste)
-  // Funziona per 1 notte, più notti, tappe consecutive
   const isLastDay = next?.idTappa !== d.idTappa;
   if(isLastDay){
     const sum=days.reduce((a,x)=>x.idTappa===d.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
-    return n(d.pagamentoManual!==""?d.pagamentoManual:sum);
+    return base + n(d.pagamentoManual!==""?d.pagamentoManual:sum);
   }
-  return n(d.pagamentoManual);
+  return base + n(d.pagamentoManual);
 };
 const calcCosto = d => ["piazzola","tassa","extraStruttura","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0);
 // extraStruttura pagata ogni giorno, piazzola+tassa al checkout tramite calcPagamento
@@ -1342,7 +1340,7 @@ function DayModal({dayIndex, data, budget, onClose, onChange, consumoMedio, prez
 }
 
 // ── Tappa Chain ────────────────────────────────────────────────────────────
-function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget}){
+function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit}){
   const totalAllocato = tappe.reduce((a,t)=>a+n(t.budgetAllocato),0);
   const nonAllocato   = budget - totalAllocato;
 
@@ -1384,7 +1382,10 @@ function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget}){
                       {Math.max(0, diffInclusive(t.startDate, t.endDate)-1)} notti
                     </div>
                   </div>
-                  <button className="btn-icon btn-sm" style={{color:"var(--red)"}} onClick={()=>onDelete(t)}>✕</button>
+                  <div style={{display:"flex",gap:4}}>
+                    <button className="btn-icon btn-sm" style={{color:"var(--primary)"}} onClick={()=>onEdit&&onEdit(t)} title="Modifica tappa">✏️</button>
+                    <button className="btn-icon btn-sm" style={{color:"var(--red)"}} onClick={()=>onDelete(t)} title="Elimina tappa">✕</button>
+                  </div>
                 </div>
                 <div className="tappa-budget-bar">
                   <div className="tappa-budget-cell">
@@ -1434,15 +1435,31 @@ function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget}){
 }
 
 // ── Tappa Modal ────────────────────────────────────────────────────────────
-function TappaModal({viaggio, onClose, onSave}){
+function TappaModal({viaggio, onClose, onSave, initial}){
   const consumoMedio = n(viaggio.consumoMedio);
-  const [f,setF] = React.useState({
+  const isEdit = !!initial;
+  const [f,setF] = React.useState(initial ? {
+    startDate: initial.startDate,
+    endDate:   initial.endDate,
+    luogo:     initial.luogo||"",
+    struttura: initial.struttura||"",
+    costoPiazzola: initial.costoPiazzola||0,
+    costoPersona:  initial.costoPersona||0,
+    numeroPersone: initial.numeroPersone||2,
+    elettricita:   initial.elettricita||0,
+    moto:          initial.moto||0,
+    tassaSoggiorno:initial.tassaSoggiorno||0,
+    extraStruttura:initial.extraStruttura||0,
+    budgetAllocato:initial.budgetAllocato||0,
+    kmTappa:       initial.kmTappa||0,
+    prezzoLitro:   initial.prezzoLitro||0,
+    costoCarburante:initial.costoCarburante||0,
+  } : {
     startDate:viaggio.startDate, endDate:addDays(viaggio.startDate,1),
     luogo:"", struttura:"",
     costoPiazzola:0, costoPersona:0, numeroPersone:2,
     elettricita:0, moto:0, tassaSoggiorno:0, extraStruttura:0,
-    budgetAllocato:0,
-    kmTappa:0, prezzoLitro:0, costoCarburante:0
+    budgetAllocato:0, kmTappa:0, prezzoLitro:0, costoCarburante:0
   });
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const notti = Math.max(0, diffInclusive(f.startDate, f.endDate)-1);
@@ -1469,7 +1486,7 @@ function TappaModal({viaggio, onClose, onSave}){
   };
 
   return (
-    <Modal title="Nuova tappa" onClose={onClose} width="640px">
+    <Modal title={isEdit?"✏️ Modifica tappa":"Nuova tappa"} onClose={onClose} width="640px">
       <div className="form-grid" style={{gap:12}}>
         <div className="field">
           <label className="field-label">Check-in</label>
@@ -1500,6 +1517,9 @@ function TappaModal({viaggio, onClose, onSave}){
       {/* Sezione carburante */}
       <div style={{marginTop:16}}>
         <div className="section-title" style={{marginBottom:10}}>⛽ Carburante per questa tappa</div>
+        <p style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>
+          KM e costo verranno inseriti nel giorno di viaggio (il giorno prima del check-in).
+        </p>
         <div className="form-grid" style={{gap:10}}>
           <div className="field">
             <label className="field-label">KM da percorrere</label>
@@ -1543,7 +1563,7 @@ function TappaModal({viaggio, onClose, onSave}){
         <div><span>Totale struttura</span><strong className="accent">€ {fmt2(totale)}</strong></div>
       </div>
       <div className="btn-row">
-        <button className="btn-primary" onClick={()=>onSave(f)}>✓ Salva tappa</button>
+        <button className="btn-primary" onClick={()=>onSave(f)}>{isEdit?"✓ Salva modifiche":"✓ Salva tappa"}</button>
         <button className="btn" onClick={onClose}>Annulla</button>
       </div>
     </Modal>
@@ -1604,6 +1624,7 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
   useBack(back);
   const [tab, setTab]           = React.useState("preventivo");
   const [showTappa, setTappa]   = React.useState(false);
+  const [editingTappa, setEditingTappa] = React.useState(null); // tappa object to edit
   const [showEdit, setEdit]     = React.useState(false);
   const [delTappa, setDelTappa] = React.useState(null);
   const [showStats, setStats]   = React.useState(true);
@@ -1630,17 +1651,32 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
     const idT   = `T${idN}`;
     const piaz  = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
     const tassa = n(form.tassaSoggiorno)*n(form.numeroPersone);
+
+    // Se sIdx ha già una tappa precedente (giorno condiviso checkout/checkin),
+    // salvo il suo pagamento checkout come campo separato prima di sovrascrivere
+    const dayAtSIdx = copy[tab][sIdx];
+    let pagamentoCheckoutPrev = 0;
+    let prevIdTappa = "";
+    if(dayAtSIdx.idTappa && dayAtSIdx.idTappa !== idT){
+      prevIdTappa = dayAtSIdx.idTappa;
+      pagamentoCheckoutPrev = copy[tab].reduce((a,x)=>x.idTappa===prevIdTappa?a+n(x.piazzola)+n(x.tassa):a,0);
+    }
+
     for(let i=sIdx;i<eIdx;i++){
-      copy[tab][i]={...copy[tab][i],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,extraStruttura:n(form.extraStruttura)};
+      copy[tab][i]={...copy[tab][i],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
     }
-    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,extraStruttura:0};
-    // Km e carburante → primo giorno della tappa
-    if(n(form.kmTappa)>0){
-      copy[tab][sIdx]={...copy[tab][sIdx], km:n(form.kmTappa)};
+    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
+
+    // Ripristino il pagamento checkout della tappa precedente sul giorno condiviso
+    if(pagamentoCheckoutPrev > 0){
+      copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
     }
-    if(n(form.costoCarburante)>0){
-      copy[tab][sIdx]={...copy[tab][sIdx], gasolio:n(form.costoCarburante)};
-    }
+
+    // Km e carburante → giorno di viaggio (giorno prima del check-in se disponibile)
+    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
+    if(n(form.kmTappa)>0)         copy[tab][fuelIdx]={...copy[tab][fuelIdx], km:n(form.kmTappa)};
+    if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio:n(form.costoCarburante)};
+
     copy.tappe.push({...form,id:Date.now(),target:tab,idTappa:idT});
     updateTrip(copy);
     setTappa(false);
@@ -1648,8 +1684,57 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
 
   const removeTappa = (tappa) => {
     const copy = {...viaggio,[tab]:[...viaggio[tab]],tappe:(viaggio.tappe||[]).filter(t=>t.id!==tappa.id)};
-    copy[tab] = copy[tab].map(d => d.idTappa===tappa.idTappa ? {...d,idTappa:"",luogo:"",struttura:"",piazzola:0,tassa:0,extraStruttura:0} : d);
+    copy[tab] = copy[tab].map(d => {
+      if(d.idTappa !== tappa.idTappa) return d;
+      if(d.prevIdTappa){
+        // Giorno condiviso: ripristino il checkout della tappa precedente
+        const prevT = (viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
+        return {...d, idTappa:d.prevIdTappa, luogo:prevT?.luogo||"", struttura:prevT?.struttura||"",
+          piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+      }
+      return {...d, idTappa:"", luogo:"", struttura:"", piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+    });
     updateTrip(copy);
+  };
+
+  const editTappaFn = (oldTappa, form) => {
+    const norm = d => (d||"").slice(0,10);
+    const sIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.startDate));
+    const eIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.endDate));
+    if(sIdx===-1||eIdx===-1||eIdx<=sIdx){ alert("Controlla le date della tappa"); return; }
+    // Clear old tappa days (restoring prev tappa checkouts if needed)
+    const copy = {...viaggio,[tab]:[...viaggio[tab]].map(d=>{
+      if(d.idTappa!==oldTappa.idTappa) return d;
+      if(d.prevIdTappa){
+        const prevT = (viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
+        return {...d, idTappa:d.prevIdTappa, luogo:prevT?.luogo||"", struttura:prevT?.struttura||"",
+          piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+      }
+      return {...d, idTappa:"", luogo:"", struttura:"", piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+    }), tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...t,...form,idTappa:oldTappa.idTappa}:t)};
+
+    const piaz  = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
+    const tassa = n(form.tassaSoggiorno)*n(form.numeroPersone);
+
+    // Check shared day
+    const dayAtSIdx = copy[tab][sIdx];
+    let pagamentoCheckoutPrev = 0, prevIdTappa = "";
+    if(dayAtSIdx.idTappa && dayAtSIdx.idTappa !== oldTappa.idTappa){
+      prevIdTappa = dayAtSIdx.idTappa;
+      pagamentoCheckoutPrev = copy[tab].reduce((a,x)=>x.idTappa===prevIdTappa?a+n(x.piazzola)+n(x.tassa):a,0);
+    }
+
+    for(let i=sIdx;i<eIdx;i++){
+      copy[tab][i]={...copy[tab][i],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
+    }
+    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
+    if(pagamentoCheckoutPrev>0) copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
+
+    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
+    if(n(form.kmTappa)>0)         copy[tab][fuelIdx]={...copy[tab][fuelIdx], km:n(form.kmTappa)};
+    if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio:n(form.costoCarburante)};
+    updateTrip(copy);
+    setEditingTappa(null);
   };
 
   const updateTappaBudget = (tappaId, val) => {
@@ -1705,6 +1790,7 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
             budget={n(viaggio.budget)}
             onDelete={t=>setDelTappa(t)}
             onUpdateBudget={updateTappaBudget}
+            onEdit={t=>setEditingTappa(t)}
           />
         )}
 
@@ -1770,6 +1856,7 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
       </div>
 
       {showTappa && <TappaModal viaggio={viaggio} onClose={()=>setTappa(false)} onSave={addTappa}/>}
+      {editingTappa && <TappaModal viaggio={viaggio} initial={editingTappa} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
       {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip}/>}
       {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
       {fsGrid && <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} fullscreen={true} onToggleFS={()=>setFsGrid(false)} onDayClick={i=>setDayModal(i)}/>}
@@ -2019,7 +2106,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.4</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.7</span></div>
         <div className="header-actions">
           <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
