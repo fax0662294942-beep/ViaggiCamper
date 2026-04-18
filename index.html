@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v6.7</title>
+<title>🚐 Viaggi Camper v6.8</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -506,7 +506,9 @@ const calcPagamento = (days,idx) => {
   const base = n(d.pagamentoCheckoutPrev||0); // checkout tappa precedente sullo stesso giorno
   if(!d.idTappa) return base + n(d.pagamentoManual);
   const next=days[idx+1];
-  const isLastDay = next?.idTappa !== d.idTappa;
+  // Non sparare se il giorno dopo ha già memorizzato il nostro checkout (prevIdTappa)
+  // evita il doppio conteggio sul giorno condiviso checkout/checkin
+  const isLastDay = next?.idTappa !== d.idTappa && next?.prevIdTappa !== d.idTappa;
   if(isLastDay){
     const sum=days.reduce((a,x)=>x.idTappa===d.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
     return base + n(d.pagamentoManual!==""?d.pagamentoManual:sum);
@@ -2106,7 +2108,7 @@ function App(){
   return (
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.7</span></div>
+        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.8</span></div>
         <div className="header-actions">
           <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
