@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v7.5</title>
+<title>🚐 CamperHub v7.7</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1631,7 +1631,7 @@ function TappaModal({viaggio, onClose, onSave, initial}){
 }
 
 // ── New / Edit Trip Modal ─────────────────────────────────────────────────
-function TripFormModal({initial, title, onClose, onSave, isCopy}){
+function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti=[]}){
   const today = new Date().toISOString().slice(0,10);
   const [f,setF] = React.useState(initial ? {
     nome: initial.nome||(isCopy?initial.nome+' (copia)':''),
@@ -1643,12 +1643,20 @@ function TripFormModal({initial, title, onClose, onSave, isCopy}){
     status: initial.status||'ipotesi',
     gruppo: initial.gruppo||'',
   } : {nome:'',budget:1000,startDate:today,endDate:addDays(today,6),veicolo:'',consumoMedio:0,status:'ipotesi',gruppo:''});
+  const [nuovoGruppo, setNuovoGruppo] = React.useState(
+    // Se initial.gruppo esiste ma non è nella lista, parti già in modalità "nuovo"
+    !!(initial?.gruppo && !gruppiEsistenti.includes(initial.gruppo))
+  );
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const giorni = diffInclusive(f.startDate, f.endDate);
   const save=()=>{
     if(!f.nome.trim()) return alert("Inserisci il nome del viaggio");
     if(giorni<1) return alert("Le date non sono valide");
     onSave(f); onClose();
+  };
+  const onSelectGruppo = val => {
+    if(val==='__nuovo__'){ setNuovoGruppo(true); u('gruppo',''); }
+    else { setNuovoGruppo(false); u('gruppo',val); }
   };
   return (
     <Modal title={title} onClose={onClose} width="460px">
@@ -1670,8 +1678,23 @@ function TripFormModal({initial, title, onClose, onSave, isCopy}){
         {/* Gruppo / evento */}
         <div className="field" style={{gridColumn:"1/-1"}}>
           <label className="field-label">📁 Gruppo / Evento</label>
-          <input type="text" className="field-input" value={f.gruppo||''} onChange={e=>u('gruppo',e.target.value)}
-            placeholder="es. Ferie agosto, Pasqua, Ponte 1 maggio..."/>
+          {!nuovoGruppo ? (
+            <select className="field-input" value={f.gruppo||''} onChange={e=>onSelectGruppo(e.target.value)}>
+              <option value="">— Nessun gruppo —</option>
+              {gruppiEsistenti.map(g=><option key={g} value={g}>{g}</option>)}
+              <option value="__nuovo__">➕ Crea nuovo gruppo...</option>
+            </select>
+          ) : (
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <input type="text" className="field-input" style={{flex:1}} autoFocus
+                value={f.gruppo||''} onChange={e=>u('gruppo',e.target.value)}
+                placeholder="es. Ferie agosto, Pasqua, Ponte 1 maggio..."/>
+              {gruppiEsistenti.length>0&&(
+                <button className="btn" style={{flexShrink:0,padding:'8px 10px',fontSize:12}}
+                  onClick={()=>setNuovoGruppo(false)}>← Lista</button>
+              )}
+            </div>
+          )}
         </div>
         <div className="field" style={{gridColumn:"1/-1"}}>
           <label className="field-label">Nome viaggio</label>
@@ -1948,7 +1971,7 @@ function TripView({viaggio, updateTrip, back, user, onShare}){
 
       {showTappa && <TappaModal viaggio={viaggio} onClose={()=>setTappa(false)} onSave={addTappa}/>}
       {editingTappa && <TappaModal viaggio={viaggio} initial={editingTappa} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
-      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip}/>}
+      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={[]}/>}
       {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
       {fsGrid && <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} fullscreen={true} onToggleFS={()=>setFsGrid(false)} onDayClick={i=>setDayModal(i)}/>}
       {dayModal!==null && <DayModal dayIndex={dayModal} data={data} budget={viaggio.budget} onClose={()=>setDayModal(null)} onChange={updateCell} consumoMedio={n(viaggio.consumoMedio)} prezzoCarburante={n(viaggio.prezzoCarburante)}/>}
@@ -2121,11 +2144,11 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
   useBack(onBack);
   const [statusFil, setStatusFil] = React.useState('all');
   const [expandedY,  setExpandedY]  = React.useState({});
+  const [expandedG,  setExpandedG]  = React.useState({});
   const [copyData,   setCopyData]   = React.useState(null);
 
   const toggleStatus = (v) => {
     const newStatus = (v.status||'ipotesi')==='ipotesi' ? 'confermato' : 'ipotesi';
-    const {id,...data} = v;
     updateTrip({...v, status:newStatus});
   };
 
@@ -2143,11 +2166,14 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
     byYear[year][grp].push(v);
   });
   const years = Object.keys(byYear).sort((a,b)=>b-a);
-  const isExp  = y => expandedY[y]!==false; // default: espanso
-  const togY   = y => setExpandedY(p=>({...p,[y]:!isExp(y)}));
+  const isExpY = y   => expandedY[y]!==false;           // anni: default espanso
+  const isExpG = key => expandedG[key]!==false;          // gruppi: default espanso
+  const togY   = y   => setExpandedY(p=>({...p,[y]:!isExpY(y)}));
+  const togG   = key => setExpandedG(p=>({...p,[key]:!isExpG(key)}));
 
   const totIpotesi  = viaggi.filter(v=>(v.status||'ipotesi')==='ipotesi').length;
   const totConf     = viaggi.filter(v=>(v.status||'ipotesi')==='confermato').length;
+  const gruppiEsistenti = [...new Set(viaggi.map(v=>(v.gruppo||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'));
 
   return(
     <div>
@@ -2179,82 +2205,101 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         )}
 
         {years.map(year=>{
-          const exp = isExp(year);
+          const expY = isExpY(year);
           const totInYear = Object.values(byYear[year]).flat().length;
           const confInYear = Object.values(byYear[year]).flat().filter(v=>(v.status||'ipotesi')==='confermato').length;
           return(
             <div key={year} style={{marginBottom:20}}>
               {/* Anno header */}
-              <div onClick={()=>togY(year)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',cursor:'pointer',borderBottom:'2px solid var(--primary-dim)',marginBottom:exp?10:0}}>
+              <div onClick={()=>togY(year)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',cursor:'pointer',borderBottom:'2px solid var(--primary-dim)',marginBottom:expY?12:0}}>
                 <span style={{fontSize:22,fontFamily:"'Syne',sans-serif",fontWeight:800,color:'var(--primary)'}}>{year}</span>
                 <span style={{fontSize:11,color:'var(--text3)',flex:1}}>
                   {totInYear} {totInYear===1?'viaggio':'viaggi'} · {confInYear} confermati
                 </span>
-                <span style={{color:'var(--text3)',fontSize:13}}>{exp?'▲':'▼'}</span>
+                <span style={{color:'var(--text3)',fontSize:13}}>{expY?'▲':'▼'}</span>
               </div>
 
-              {exp && Object.entries(byYear[year]).sort(([a],[b])=>a.localeCompare(b,'it')).map(([grp,trips])=>(
-                <div key={grp} style={{marginBottom:14}}>
-                  {/* Gruppo header */}
-                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,paddingLeft:2}}>
-                    <span style={{fontSize:13}}>📁</span>
-                    <span style={{fontSize:12,fontWeight:700,color:'var(--text2)'}}>{grp}</span>
-                    <span style={{fontSize:11,color:'var(--text3)'}}>({trips.length})</span>
-                  </div>
-
-                  {/* Trip rows */}
-                  {trips.sort((a,b)=>a.startDate>b.startDate?1:-1).map(v=>{
-                    const isConf = (v.status||'ipotesi')==='confermato';
-                    const giorni = diffInclusive(v.startDate,v.endDate);
-                    const stats  = getStats(v.consuntivo||[], v.budget);
-                    const hasData= (v.consuntivo||[]).some(d=>calcCosto(d)>0);
-                    return(
-                      <div key={v.id} className="card-sm" style={{marginBottom:6,padding:'10px 12px',cursor:'pointer',marginLeft:4}}
-                        onClick={()=>onOpen(v.id)}>
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}}>
-                              <span style={{fontSize:13,fontWeight:600}}>{v.nome}</span>
-                              {/* Status badge — tap to toggle */}
-                              <span onClick={e=>{e.stopPropagation();toggleStatus(v);}}
-                                title="Tocca per cambiare stato"
-                                style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:10,cursor:'pointer',
-                                  background:isConf?'rgba(82,214,138,.15)':'rgba(79,216,180,.08)',
-                                  color:isConf?'var(--green)':'var(--primary)',
-                                  border:'1px solid '+(isConf?'var(--green)':'var(--primary)')}}>
-                                {isConf?'✅ Confermato':'💭 Ipotesi'}
-                              </span>
-                            </div>
-                            <div style={{fontSize:11,color:'var(--text3)'}}>
-                              {fmtDate(v.startDate)} → {fmtDate(v.endDate)} · {giorni}g · €{fmt2(n(v.budget))}
-                              {hasData&&<span style={{color:stats.residuo>=0?'var(--green)':'var(--red)',marginLeft:6}}>
-                                residuo €{fmt2(stats.residuo)}
-                              </span>}
-                            </div>
-                          </div>
-                          {/* Azioni */}
-                          <div style={{display:'flex',gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-                            <button className="btn-icon btn-sm" title="Copia viaggio"
-                              onClick={()=>setCopyData(v)} style={{fontSize:14,padding:'4px 6px'}}>📋</button>
-                            <button className="btn-icon btn-sm" style={{color:'var(--primary)',padding:'4px 6px'}}
-                              onClick={()=>setShare(v)} title="Condividi">👥</button>
-                            {v.ownerId===user.uid&&
-                              <button className="btn-icon btn-sm" style={{color:'var(--red)',padding:'4px 6px'}}
-                                onClick={()=>setDel(v.id)}>🗑</button>}
-                          </div>
+              {expY && Object.entries(byYear[year]).sort(([a],[b])=>a.localeCompare(b,'it')).map(([grp,trips])=>{
+                const gkey = year+'_'+grp;
+                const expG = isExpG(gkey);
+                const confInGrp = trips.filter(v=>(v.status||'ipotesi')==='confermato').length;
+                const ipotInGrp = trips.filter(v=>(v.status||'ipotesi')==='ipotesi').length;
+                return(
+                  <div key={grp} style={{marginBottom:10,background:'var(--card)',borderRadius:14,border:'1px solid var(--border2)',overflow:'hidden'}}>
+                    {/* Gruppo header — collassabile */}
+                    <div onClick={()=>togG(gkey)}
+                      style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',cursor:'pointer',
+                        background:expG?'var(--card2)':'var(--card)'}}>
+                      <span style={{fontSize:18,flexShrink:0}}>📁</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{grp}</div>
+                        <div style={{fontSize:11,color:'var(--text3)',marginTop:2,display:'flex',gap:8}}>
+                          <span>{trips.length} {trips.length===1?'viaggio':'viaggi'}</span>
+                          {confInGrp>0&&<span style={{color:'var(--green)'}}>✅ {confInGrp} confermati</span>}
+                          {ipotInGrp>0&&<span style={{color:'var(--primary)'}}>💭 {ipotInGrp} ipotesi</span>}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
+                      <span style={{color:'var(--text3)',fontSize:13,flexShrink:0}}>{expG?'▲':'▼'}</span>
+                    </div>
+
+                    {/* Trip rows dentro il gruppo */}
+                    {expG && (
+                      <div style={{borderTop:'1px solid var(--border)'}}>
+                        {trips.sort((a,b)=>a.startDate>b.startDate?1:-1).map((v,idx)=>{
+                          const isConf = (v.status||'ipotesi')==='confermato';
+                          const giorni = diffInclusive(v.startDate,v.endDate);
+                          const stats  = getStats(v.consuntivo||[], v.budget);
+                          const hasData= (v.consuntivo||[]).some(d=>calcCosto(d)>0);
+                          return(
+                            <div key={v.id} style={{padding:'10px 14px',cursor:'pointer',
+                              borderBottom:idx<trips.length-1?'1px solid var(--border)':'none',
+                              background:'var(--bg2)'}}
+                              onClick={()=>onOpen(v.id)}>
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}}>
+                                    <span style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{v.nome}</span>
+                                    <span onClick={e=>{e.stopPropagation();toggleStatus(v);}}
+                                      title="Tocca per cambiare stato"
+                                      style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:10,cursor:'pointer',
+                                        background:isConf?'rgba(82,214,138,.15)':'rgba(79,216,180,.08)',
+                                        color:isConf?'var(--green)':'var(--primary)',
+                                        border:'1px solid '+(isConf?'var(--green)':'var(--primary)')}}>
+                                      {isConf?'✅ Confermato':'💭 Ipotesi'}
+                                    </span>
+                                  </div>
+                                  <div style={{fontSize:11,color:'var(--text3)'}}>
+                                    {fmtDate(v.startDate)} → {fmtDate(v.endDate)} · {giorni}g · €{fmt2(n(v.budget))}
+                                    {hasData&&<span style={{color:stats.residuo>=0?'var(--green)':'var(--red)',marginLeft:6}}>
+                                      res. €{fmt2(stats.residuo)}
+                                    </span>}
+                                  </div>
+                                </div>
+                                <div style={{display:'flex',gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                                  <button className="btn-icon btn-sm" title="Copia"
+                                    onClick={()=>setCopyData(v)} style={{fontSize:13,padding:'4px 5px'}}>📋</button>
+                                  <button className="btn-icon btn-sm" style={{color:'var(--primary)',padding:'4px 5px'}}
+                                    onClick={()=>setShare(v)} title="Condividi">👥</button>
+                                  {v.ownerId===user.uid&&
+                                    <button className="btn-icon btn-sm" style={{color:'var(--red)',padding:'4px 5px'}}
+                                      onClick={()=>setDel(v.id)}>🗑</button>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
       </div>
 
-      {showNew&&<TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
-      {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy
+      {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
+      {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti}
         initial={{...copyData, nome:copyData.nome+' (copia)', preventivo:undefined, consuntivo:undefined, tappe:[]}}
         onClose={()=>setCopyData(null)} onSave={f=>{addTrip(f);setCopyData(null);}}/>}
       {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`}
@@ -3056,7 +3101,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.5</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.7</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
         </div>
