@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 Viaggi Camper v6.8</title>
+<title>🚐 CamperHub v7.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -377,6 +377,16 @@ th.th-group-sep{border-left:2px solid var(--border2)!important}
   .stat-val,.cell.derived{color:#000}
   .btn-tab,.btn-row{display:none!important}
 }
+/* ── Dispensa ── */
+.ds-status{display:inline-flex;align-items:center;padding:3px 9px;border-radius:14px;font-size:11px;font-weight:700;border:1.5px solid;cursor:pointer;transition:opacity .15s;white-space:nowrap;gap:3px}
+.ds-ok{color:#52d68a;border-color:#52d68a;background:rgba(82,214,138,.12)}
+.ds-low{color:var(--accent);border-color:var(--accent);background:rgba(240,160,69,.12)}
+.ds-out{color:var(--red);border-color:var(--red);background:rgba(240,96,96,.12)}
+.ds-fab{position:fixed;bottom:24px;right:20px;width:52px;height:52px;border-radius:26px;background:var(--primary-dim);color:#fff;font-size:28px;line-height:1;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:40;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer}
+.ds-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ds-row:last-child{border-bottom:none}
+.ds-hub-card{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:14px 16px;margin-bottom:16px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .15s}
+.ds-hub-card:active{border-color:var(--primary-dim)}
 </style>
 </head>
 <body>
@@ -422,6 +432,53 @@ window.addEventListener("popstate", function(){
 </script>
 
 <script type="text/babel">
+// ── Dispensa constants ────────────────────────────────────────────────────
+const DISP_CATS_DEFAULT = [
+  {id:'bagno',       name:'Bagno',        icon:'🚿', color:'#A855F7'},
+  {id:'detersivi',   name:'Detersivi',    icon:'🧴', color:'#4DA6FF'},
+  {id:'biancheria',  name:'Biancheria',   icon:'🛏️', color:'#06B6D4'},
+  {id:'dispensa',    name:'Dispensa',     icon:'🥫', color:'#FF6B6B'},
+  {id:'attrezzatura',name:'Attrezzatura', icon:'🔧', color:'#F59E0B'},
+  {id:'varie',       name:'Varie',        icon:'📦', color:'#6B7280'},
+  {id:'dacasa',      name:'Da casa',      icon:'🏠', color:'#10B981'},
+  {id:'dagarage',    name:'Da garage',    icon:'🪛', color:'#8B5CF6'},
+];
+const DISP_PRODS_TPL = [
+  {name:'Shampoo',cat:'bagno'},{name:'Bagnoschiuma',cat:'bagno'},
+  {name:'Deodorante',cat:'bagno'},{name:'Dentifricio',cat:'bagno'},
+  {name:'Rasoio',cat:'bagno'},{name:'Crema solare',cat:'bagno'},
+  {name:'Cerotti/kit pronto soccorso',cat:'bagno'},
+  {name:'Detersivo piatti',cat:'detersivi'},{name:'Detersivo lavatrice',cat:'detersivi'},
+  {name:'Spugne/strofinacci',cat:'detersivi'},{name:'Carta igienica',cat:'detersivi'},
+  {name:'Sacchi spazzatura',cat:'detersivi'},
+  {name:'Lenzuola',cat:'biancheria'},{name:'Cuscini',cat:'biancheria'},
+  {name:'Asciugamani',cat:'biancheria'},{name:'Telo mare',cat:'biancheria'},
+  {name:'Pasta',cat:'dispensa'},{name:'Olio EVO',cat:'dispensa'},
+  {name:'Sale e pepe',cat:'dispensa'},{name:'Caffè',cat:'dispensa'},
+  {name:'Acqua minerale',cat:'dispensa'},
+  {name:'Prolunga elettrica',cat:'attrezzatura'},{name:'Adattatore corrente',cat:'attrezzatura'},
+  {name:'Sedie/tavolo esterno',cat:'attrezzatura'},{name:'Kit emergenza',cat:'attrezzatura'},
+  {name:'Medicinali base',cat:'varie'},{name:'Documenti',cat:'varie'},
+  {name:'Caricabatterie',cat:'varie'},{name:'Triangolo/giubbotto',cat:'varie'},
+  {name:'Abbigliamento',cat:'dacasa'},{name:'Libri/giochi',cat:'dacasa'},
+  {name:'Attrezzi base',cat:'dagarage'},{name:'Bici/monopattino',cat:'dagarage'},
+];
+const DISP_PERS_DEFAULT = [{id:'p1', nome:'Franco', colore:'#4fd8b4', disabled:false}];
+const DISP_EMOJIS = ['📦','🚿','🧴','🛏️','🥫','🔧','🏠','🪛','🍕','🎒','👕','📱','🔑','💊','🧹','🥘','🍫','☕','🧃','🌿','🪥','🧽','🛒','🎯','💡','🔌','⛺','📚','🧸','🌊','🎿','🚲','🍷','🧀','🥩','🫙','🧊','🍳'];
+const DISP_BAG_ICONS = ['🧳','🎒','👜','💼','🛍️','🧺','📦','⛺'];
+const DISP_COLORS = ['#4fd8b4','#f0a045','#f06060','#4da6ff','#a855f7','#10b981','#f43f5e','#0ea5e9','#fb923c'];
+const mkDispProds = () => { let id = Date.now(); return DISP_PRODS_TPL.map(p=>({id:id++,name:p.name,cat:p.cat,qty:'',note:'',status:'ok',toBuy:false,disabled:false})); };
+const mkDispensaDoc = (uid, email) => ({
+  ownerId:uid, members:[uid], memberEmails:[email],
+  categories:DISP_CATS_DEFAULT, products:mkDispProds(),
+  spesaManuale:[], persone:DISP_PERS_DEFAULT,
+  valigie:[], valigieProdotti:[],
+});
+const dsStatusLabel = s => s==='ok'?'✅ OK':s==='low'?'⚠️ Scarso':'❌ Mancante';
+const dsStatusClass = s => s==='ok'?'ds-ok':s==='low'?'ds-low':'ds-out';
+const dsCycleStatus = s => ({ok:'low',low:'out',out:'ok'})[s||'ok'];
+function hexRgb(h){const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);return r?`${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}`:'79,216,180';}
+
 // ── Back hook ──────────────────────────────────────────────────────────────
 // Each component that "owns" a back action registers here.
 // The hook stacks/unstacks automatically on mount/unmount.
@@ -2027,124 +2084,806 @@ function ShareModal({viaggio, user, onClose}){
   );
 }
 
-// ── Home View ──────────────────────────────────────────────────────────────
-function App(){
-  const [user,setUser]       = React.useState(undefined); // undefined=loading
-  const [viaggi,setViaggi]   = React.useState([]);
-  const [activeId,setActiveId] = React.useState(null);
-  const [showNew,setNew]     = React.useState(false);
-  const [delId,setDel]       = React.useState(null);
-  const [showShare,setShare] = React.useState(null); // viaggio object
+// ── Dispensa Share Modal ─────────────────────────────────────────────────
+function DispensaShareModal({dispensa, dispensaId, user, onClose}){
+  const [email,setEmail]=React.useState('');
+  const [status,setStatus]=React.useState('');
+  const [msg,setMsg]=React.useState('');
+  const memberEmails=dispensa.memberEmails||[user.email];
+  const members=dispensa.members||[user.uid];
+  const isOwner=dispensa.ownerId===user.uid;
+  const addUser=async()=>{
+    const em=email.trim().toLowerCase();
+    if(!em){setStatus('err');setMsg('Inserisci un email');return;}
+    if(memberEmails.includes(em)){setStatus('err');setMsg('Utente già presente');return;}
+    setStatus('loading');setMsg('');
+    try{
+      const snap=await firebase.firestore().collection('users').where('email','==',em).limit(1).get();
+      if(snap.empty){setStatus('err');setMsg("Utente non trovato — deve prima registrarsi nell'app");return;}
+      const uid=snap.docs[0].id;
+      await firebase.firestore().collection('dispensa').doc(dispensaId).update({
+        members:firebase.firestore.FieldValue.arrayUnion(uid),
+        memberEmails:firebase.firestore.FieldValue.arrayUnion(em),
+      });
+      setStatus('ok');setMsg('✓ '+em+' aggiunto!');setEmail('');
+    }catch(e){setStatus('err');setMsg(e.message);}
+  };
+  const removeUser=async(uid,em)=>{
+    await firebase.firestore().collection('dispensa').doc(dispensaId).update({
+      members:firebase.firestore.FieldValue.arrayRemove(uid),
+      memberEmails:firebase.firestore.FieldValue.arrayRemove(em),
+    });
+  };
+  return(
+    <Modal title="👥 Condividi Dispensa" onClose={onClose} width="460px">
+      <div className="section-title" style={{marginBottom:8}}>Partecipanti</div>
+      {memberEmails.map((em,i)=>(
+        <div key={em} className="share-member">
+          <span style={{flex:1,fontSize:13}}>{em}</span>
+          {em===user.email&&<span className="badge">tu</span>}
+          {i===0&&<span className="badge accent">owner</span>}
+          {isOwner&&em!==user.email&&(
+            <button className="btn-icon btn-sm" style={{color:'var(--red)'}} onClick={()=>removeUser(members[i],em)}>✕</button>
+          )}
+        </div>
+      ))}
+      <div className="section-title" style={{marginTop:16,marginBottom:8}}>Aggiungi persona</div>
+      <p style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>L'altra persona deve prima registrarsi nell'app con la stessa email.</p>
+      <div style={{display:'flex',gap:8}}>
+        <input type="email" className="field-input" value={email} onChange={e=>setEmail(e.target.value)}
+          placeholder="email@esempio.com" onKeyDown={e=>e.key==='Enter'&&addUser()} style={{flex:1}}/>
+        <button className="btn-primary" onClick={addUser} disabled={status==='loading'}>{status==='loading'?'...':'+ Aggiungi'}</button>
+      </div>
+      {msg&&<p style={{fontSize:12,marginTop:8,color:status==='ok'?'var(--green)':'var(--red)'}}>{msg}</p>}
+      <div className="btn-row"><button className="btn" onClick={onClose}>Chiudi</button></div>
+    </Modal>
+  );
+}
 
-  // Auth listener
+// ── Dispensa View ─────────────────────────────────────────────────────────
+function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
+  useBack(onBack);
+  const cats        = dispensa.categories     || DISP_CATS_DEFAULT;
+  const prods       = dispensa.products       || [];
+  const spesa       = dispensa.spesaManuale   || [];
+  const persone     = dispensa.persone        || DISP_PERS_DEFAULT;
+  const valigie     = dispensa.valigie        || [];
+  const valProd     = dispensa.valigieProdotti|| [];
+
+  const [tab,setTab]           = React.useState('inventario');
+  const [selCat,setSelCat]     = React.useState('all');
+  const [invFil,setInvFil]     = React.useState('all');
+  const [portareOk,setPortareOk] = React.useState({});
+  const [persId,setPersId]     = React.useState(null);
+  const [expandV,setExpandV]   = React.useState(null);
+  const [manInp,setManInp]     = React.useState('');
+  const [showShare,setShowShare]= React.useState(false);
+  // modals: null | {type, data}
+  const [modal,setModal]       = React.useState(null);
+
+  const upd = ch => updateDispensa({...dispensa,...ch});
+  const activePers = persId || persone.filter(p=>!p.disabled)[0]?.id;
+
+  // ── CRUD helpers ──────────────────────────────────────────────────────
+  const saveProd = p => { upd({products: p.id ? prods.map(x=>x.id===p.id?p:x) : [...prods,{...p,id:Date.now()}]}); setModal(null); };
+  const delProd  = id => { upd({products:prods.filter(p=>p.id!==id), valigieProdotti:valProd.filter(vp=>vp.productId!==id)}); setModal(null); };
+  const setStatus= (id,s) => upd({products:prods.map(p=>p.id===id?{...p,status:s}:p)});
+  const toggleBuy= id => upd({products:prods.map(p=>p.id===id?{...p,toBuy:!p.toBuy}:p)});
+
+  const saveCat = c => { upd({categories: c.id&&cats.find(x=>x.id===c.id) ? cats.map(x=>x.id===c.id?c:x) : [...cats,{...c,id:'cat_'+Date.now()}]}); setModal(null); };
+  const delCat  = id => { if(prods.some(p=>p.cat===id)){alert('Sposta prima i prodotti da questa categoria.');return;} if(!confirm('Eliminare la categoria?'))return; upd({categories:cats.filter(c=>c.id!==id)}); setModal(null); };
+
+  const saveValigia = v => { upd({valigie: v.id&&valigie.find(x=>x.id===v.id) ? valigie.map(x=>x.id===v.id?v:x) : [...valigie,{...v,id:'v_'+Date.now(),personaId:activePers}]}); setModal(null); };
+  const delValigia  = id => { if(!confirm('Eliminare valigia e contenuto?'))return; upd({valigie:valigie.filter(v=>v.id!==id), valigieProdotti:valProd.filter(vp=>vp.valigiaId!==id)}); setModal(null); };
+
+  const saveVP = vp => { upd({valigieProdotti: vp.id&&valProd.find(x=>x.id===vp.id) ? valProd.map(x=>x.id===vp.id?vp:x) : [...valProd,{...vp,id:'vp_'+Date.now()}]}); setModal(null); };
+  const delVP  = id => { upd({valigieProdotti:valProd.filter(i=>i.id!==id)}); setModal(null); };
+  const toggleVPStatus = (id,s) => upd({valigieProdotti:valProd.map(i=>i.id===id?{...i,status:s}:i)});
+
+  const savePersona = p => { upd({persone: p.id&&persone.find(x=>x.id===p.id) ? persone.map(x=>x.id===p.id?p:x) : [...persone,{...p,id:'p_'+Date.now()}]}); setModal(null); };
+  const delPersona  = id => { if(!confirm('Eliminare persona e tutte le sue valigie?'))return; const vids=valigie.filter(v=>v.personaId===id).map(v=>v.id); upd({persone:persone.filter(p=>p.id!==id),valigie:valigie.filter(v=>v.personaId!==id),valigieProdotti:valProd.filter(vp=>!vids.includes(vp.valigiaId))}); setModal(null); };
+
+  const addManual   = () => { if(!manInp.trim())return; upd({spesaManuale:[...spesa,{id:Date.now(),name:manInp.trim(),done:false}]}); setManInp(''); };
+  const toggleManual= id => upd({spesaManuale:spesa.map(s=>s.id===id?{...s,done:!s.done}:s)});
+  const removeManual= id => upd({spesaManuale:spesa.filter(s=>s.id!==id)});
+
+  const filteredProds = React.useMemo(()=>{
+    let r=prods.filter(p=>!p.disabled);
+    if(selCat!=='all') r=r.filter(p=>p.cat===selCat);
+    if(invFil==='low')  r=r.filter(p=>p.status==='low');
+    else if(invFil==='out') r=r.filter(p=>p.status==='out');
+    else if(invFil==='buy') r=r.filter(p=>p.toBuy);
+    return r.sort((a,b)=>a.name.localeCompare(b.name,'it'));
+  },[prods,selCat,invFil]);
+
+  // ── TAB: INVENTARIO ───────────────────────────────────────────────────
+  const TabInventario = () => {
+    const active=prods.filter(p=>!p.disabled);
+    const ok=active.filter(p=>p.status==='ok').length;
+    const low=active.filter(p=>p.status==='low').length;
+    const out=active.filter(p=>p.status==='out').length;
+    const buy=active.filter(p=>p.toBuy).length;
+    return (
+      <div>
+        {/* Statistiche rapide */}
+        <div className="card-sm" style={{display:'flex',justifyContent:'space-around',padding:'12px 4px',marginBottom:12}}>
+          {[[active.length,'var(--text)','TOTALE','all','all'],[low,'var(--accent)','⚠️ SCARSO','all','low'],[out,'var(--red)','❌ MANCANTE','all','out'],[buy,'var(--primary)','🛒 DA COMP.','all','buy']].map(([num,col,lbl,cat,fil])=>(
+            <div key={lbl} onClick={()=>{setSelCat(cat);setInvFil(fil);}} style={{textAlign:'center',cursor:'pointer'}}>
+              <div style={{fontSize:22,fontWeight:800,fontFamily:"'Syne',sans-serif",color:col,lineHeight:1}}>{num}</div>
+              <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginTop:3}}>{lbl}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Griglia categorie */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:12}}>
+          {[{id:'all',name:'Tutti',icon:'📋',color:'#4fd8b4'},...cats].map(c=>{
+            const tot = c.id==='all' ? prods.filter(p=>!p.disabled).length : prods.filter(p=>p.cat===c.id&&!p.disabled).length;
+            const bad = c.id==='all' ? 0 : prods.filter(p=>p.cat===c.id&&!p.disabled&&(p.status==='low'||p.status==='out')).length;
+            const isSel = selCat===c.id;
+            return (
+              <div key={c.id} onClick={()=>{setSelCat(c.id);setInvFil('all');}}
+                style={{background:isSel?`rgba(${hexRgb(c.color)},.18)`:'var(--card)',border:'1.5px solid '+(isSel?c.color:'var(--border)'),borderRadius:12,padding:'10px 4px',textAlign:'center',cursor:'pointer',position:'relative',transition:'all .15s'}}>
+                <div style={{fontSize:18,marginBottom:3}}>{c.icon}</div>
+                <div style={{fontSize:9,color:'var(--text2)',fontWeight:600,lineHeight:1.2}}>{c.name}</div>
+                <div style={{fontSize:11,fontWeight:700,color:bad>0?'var(--red)':'var(--text2)'}}>{tot}</div>
+                {bad>0&&<div style={{position:'absolute',top:3,right:3,background:'var(--red)',color:'#fff',fontSize:9,fontWeight:800,minWidth:15,height:15,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center'}}>{bad}</div>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Filtri stato */}
+        {selCat!=='all'&&(
+          <div style={{display:'flex',gap:5,marginBottom:10,overflowX:'auto'}}>
+            {[['all','Tutti'],['low','⚠️ Scarso'],['out','❌ Mancante'],['buy','🛒 Da comprare']].map(([f,l])=>(
+              <button key={f} className={`btn-tab${invFil===f?' active':''}`} onClick={()=>setInvFil(f)} style={{flexShrink:0,padding:'4px 9px',fontSize:11}}>{l}</button>
+            ))}
+          </div>
+        )}
+
+        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+          <button className="btn" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setModal({type:'catManage'})}>⚙️ Categorie</button>
+        </div>
+
+        {filteredProds.length===0
+          ? <div className="empty"><div className="empty-icon">📦</div><p>Nessun prodotto trovato</p></div>
+          : <div className="card-sm" style={{padding:'0 12px'}}>
+              {filteredProds.map(p=>{
+                const cat=cats.find(c=>c.id===p.cat);
+                return (
+                  <div key={p.id} className="ds-row">
+                    <span style={{fontSize:16,flexShrink:0}}>{cat?.icon||'📦'}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
+                      {(p.qty||p.note)&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
+                    </div>
+                    <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
+                      {dsStatusLabel(p.status||'ok')}
+                    </button>
+                    <button className="btn-icon btn-sm" title={p.toBuy?'Togli da spesa':'Aggiungi a spesa'}
+                      style={{color:p.toBuy?'var(--primary)':'var(--text3)',fontSize:15}} onClick={()=>toggleBuy(p.id)}>🛒</button>
+                    <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
+                  </div>
+                );
+              })}
+            </div>
+        }
+        <button className="ds-fab" onClick={()=>setModal({type:'prod',data:{id:null,name:'',cat:cats[0]?.id||'varie',qty:'',note:'',status:'ok',toBuy:false,disabled:false}})}>+</button>
+      </div>
+    );
+  };
+
+  // ── TAB: SPESA ────────────────────────────────────────────────────────
+  const TabSpesa = () => {
+    const autoBuy=prods.filter(p=>p.toBuy&&!p.disabled);
+    return (
+      <div>
+        <div className="card-sm" style={{textAlign:'center',padding:'14px',marginBottom:12}}>
+          <div style={{fontSize:28,fontWeight:800,fontFamily:"'Syne',sans-serif",color:'var(--primary)'}}>{autoBuy.length+spesa.filter(s=>!s.done).length}</div>
+          <div style={{fontSize:12,color:'var(--text2)'}}>articoli da acquistare</div>
+        </div>
+        {autoBuy.length>0&&(
+          <div style={{marginBottom:14}}>
+            <div className="section-title" style={{marginBottom:8}}>📦 Da inventario</div>
+            <div className="card-sm" style={{padding:'0 12px'}}>
+              {autoBuy.map(p=>{const cat=cats.find(c=>c.id===p.cat);return(
+                <div key={p.id} className="ds-row">
+                  <span style={{fontSize:15}}>{cat?.icon||'📦'}</span>
+                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500}}>{p.name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{cat?.name}</div></div>
+                  <span className={`ds-status ${dsStatusClass(p.status||'ok')}`}>{dsStatusLabel(p.status||'ok')}</span>
+                  <button className="btn-icon btn-sm" style={{color:'var(--red)'}} title="Togli dalla lista" onClick={()=>toggleBuy(p.id)}>✕</button>
+                </div>
+              );})}
+            </div>
+          </div>
+        )}
+        <div className="section-title" style={{marginBottom:8}}>✍️ Lista manuale</div>
+        <div style={{display:'flex',gap:8,marginBottom:10}}>
+          <input className="field-input" style={{flex:1}} value={manInp} onChange={e=>setManInp(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&addManual()} placeholder="Aggiungi articolo..."/>
+          <button className="btn-primary" onClick={addManual}>+</button>
+        </div>
+        {spesa.length>0&&(
+          <div className="card-sm" style={{padding:'0 12px'}}>
+            {spesa.map(s=>(
+              <div key={s.id} className="ds-row">
+                <button className="btn-icon btn-sm" style={{color:s.done?'var(--green)':'var(--text3)',fontSize:18,width:24,flexShrink:0}} onClick={()=>toggleManual(s.id)}>{s.done?'✓':'○'}</button>
+                <span style={{flex:1,fontSize:13,textDecoration:s.done?'line-through':'none',color:s.done?'var(--text3)':'var(--text)'}}>{s.name}</span>
+                <button className="btn-icon btn-sm" style={{color:'var(--red)'}} onClick={()=>removeManual(s.id)}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {autoBuy.length===0&&spesa.length===0&&<div className="empty"><div className="empty-icon">🛒</div><p>Lista spesa vuota!</p></div>}
+      </div>
+    );
+  };
+
+  // ── TAB: DA PORTARE ───────────────────────────────────────────────────
+  const TabPortare = () => {
+    const items=prods.filter(p=>(p.status==='out'||p.status==='low')&&!p.toBuy&&!p.disabled);
+    if(!items.length) return(
+      <div className="empty" style={{paddingTop:60}}>
+        <div className="empty-icon">🏠</div>
+        <p>Nessun articolo da portare!</p>
+        <p style={{fontSize:12,color:'var(--text3)',marginTop:8}}>Appaiono qui i prodotti Scarso/Mancante che non sono nella lista spesa.</p>
+      </div>
+    );
+    const rimasti=items.filter(p=>!portareOk[p.id]).length;
+    return(
+      <div>
+        <div className="card-sm" style={{textAlign:'center',padding:'12px',marginBottom:12}}>
+          <div style={{fontSize:26,fontWeight:800,fontFamily:"'Syne',sans-serif",color:'var(--accent)'}}>{rimasti}</div>
+          <div style={{fontSize:12,color:'var(--text2)'}}>da portare da casa</div>
+        </div>
+        <div className="card-sm" style={{padding:'0 12px'}}>
+          {items.map(p=>{
+            const checked=!!portareOk[p.id], cat=cats.find(c=>c.id===p.cat);
+            return(
+              <div key={p.id} className="ds-row" style={{opacity:checked?0.45:1}}>
+                <button className="btn-icon btn-sm" style={{color:checked?'var(--green)':'var(--text3)',fontSize:18,width:24,flexShrink:0}}
+                  onClick={()=>setPortareOk(prev=>({...prev,[p.id]:!prev[p.id]}))}>
+                  {checked?'✓':'○'}
+                </button>
+                <span style={{fontSize:15}}>{cat?.icon||'📦'}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:500,textDecoration:checked?'line-through':'none'}}>{p.name}</div>
+                  {p.note&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.note}</div>}
+                </div>
+                <span className={`ds-status ${dsStatusClass(p.status)}`}>{dsStatusLabel(p.status)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ── TAB: VALIGIE ──────────────────────────────────────────────────────
+  const TabValigie = () => {
+    const activePersList=persone.filter(p=>!p.disabled);
+    const myV=valigie.filter(v=>v.personaId===activePers);
+    const currP=persone.find(p=>p.id===activePers);
+    return(
+      <div>
+        {activePersList.length>1&&(
+          <div style={{display:'flex',gap:8,overflowX:'auto',marginBottom:12,paddingBottom:2}}>
+            {activePersList.map(p=>(
+              <button key={p.id} onClick={()=>setPersId(p.id)}
+                style={{padding:'6px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,
+                  background:p.id===activePers?p.colore:'var(--card)',color:p.id===activePers?'var(--bg)':'var(--text2)',
+                  border:'1.5px solid '+(p.id===activePers?p.colore:'var(--border2)')}}>
+                {p.nome}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="card-sm" style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,padding:'12px 16px'}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:700}}>{currP?.nome||'—'}</div>
+            <div style={{fontSize:11,color:'var(--text2)'}}>{myV.length} {myV.length===1?'valigia':'valigie'}</div>
+          </div>
+          <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}}
+            onClick={()=>setModal({type:'valigia',data:{id:null,nome:'',icon:'🧳',personaId:activePers}})}>+ Valigia</button>
+        </div>
+        {myV.length===0
+          ? <div className="empty"><div className="empty-icon">🧳</div><p>Nessuna valigia per {currP?.nome||'questa persona'}</p></div>
+          : myV.map(v=>{
+              const items=valProd.filter(i=>i.valigiaId===v.id&&!i.disabled);
+              const okC=items.filter(i=>i.status==='ok').length;
+              const isExp=expandV===v.id;
+              return(
+                <div key={v.id} className="card-sm" style={{marginBottom:10,padding:0,overflow:'hidden'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:isExp?'1px solid var(--border)':'none',cursor:'pointer'}}
+                    onClick={()=>setExpandV(isExp?null:v.id)}>
+                    <span style={{fontSize:20}}>{v.icon||'🧳'}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{v.nome}</div>
+                      <div style={{fontSize:11,color:items.length>0&&okC===items.length?'var(--green)':'var(--text2)'}}>
+                        {items.length===0?'vuota':`${okC}/${items.length} OK`}
+                      </div>
+                    </div>
+                    <button className="btn-icon btn-sm" style={{color:'var(--primary)'}}
+                      onClick={e=>{e.stopPropagation();setModal({type:'valigia',data:{...v}});}}>✏️</button>
+                    <span style={{color:'var(--text3)',fontSize:12}}>{isExp?'▲':'▼'}</span>
+                  </div>
+                  {isExp&&(
+                    <div style={{padding:'4px 14px 12px'}}>
+                      {items.length===0&&<p style={{fontSize:12,color:'var(--text3)',padding:'8px 0'}}>Valigia vuota — aggiungi articoli</p>}
+                      {items.map(item=>(
+                        <div key={item.id} className="ds-row">
+                          <button className={`ds-status ${dsStatusClass(item.status||'ok')}`}
+                            style={{fontSize:10,padding:'2px 7px'}} onClick={()=>toggleVPStatus(item.id,dsCycleStatus(item.status))}>
+                            {item.status==='ok'?'✅':item.status==='low'?'⚠️':'❌'}
+                          </button>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:12,fontWeight:500}}>{item.name}</div>
+                            {item.note&&<div style={{fontSize:10,color:'var(--text3)'}}>{item.note}</div>}
+                          </div>
+                          <button className="btn-icon btn-sm" onClick={()=>setModal({type:'vpItem',data:{...item}})}>✏️</button>
+                        </div>
+                      ))}
+                      <button className="btn" style={{width:'100%',marginTop:8,fontSize:12,padding:'7px'}}
+                        onClick={()=>setModal({type:'vpItem',data:{id:null,name:'',note:'',status:'ok',disabled:false,valigiaId:v.id}})}>
+                        + Aggiungi articolo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+        }
+      </div>
+    );
+  };
+
+  // ── TAB: IMPOSTAZIONI ─────────────────────────────────────────────────
+  const TabImpostazioni = () => (
+    <div>
+      <div className="section-title" style={{marginBottom:10}}>👥 Persone</div>
+      <div className="card-sm" style={{padding:'0 12px',marginBottom:12}}>
+        {persone.map(p=>(
+          <div key={p.id} className="ds-row">
+            <div style={{width:20,height:20,borderRadius:10,background:p.colore,flexShrink:0}}/>
+            <span style={{flex:1,fontSize:13,color:p.disabled?'var(--text3)':'var(--text)'}}>{p.nome}{p.disabled?' (inattiva)':''}</span>
+            <button className="btn-icon btn-sm" onClick={()=>setModal({type:'persona',data:{...p}})}>✏️</button>
+          </div>
+        ))}
+        <button className="btn" style={{width:'100%',margin:'8px 0 4px',fontSize:12,padding:'7px'}}
+          onClick={()=>setModal({type:'persona',data:{id:null,nome:'',colore:'#4fd8b4',disabled:false}})}>
+          + Aggiungi persona
+        </button>
+      </div>
+      <div className="section-title" style={{marginBottom:10}}>🗂️ Categorie</div>
+      <div className="card-sm" style={{padding:'0 12px',marginBottom:12}}>
+        {cats.map(c=>(
+          <div key={c.id} className="ds-row">
+            <span style={{fontSize:18}}>{c.icon}</span>
+            <span style={{flex:1,fontSize:13}}>{c.name}</span>
+            <span style={{fontSize:11,color:'var(--text3)'}}>{prods.filter(p=>p.cat===c.id&&!p.disabled).length} prod.</span>
+            <button className="btn-icon btn-sm" onClick={()=>setModal({type:'cat',data:{...c}})}>✏️</button>
+          </div>
+        ))}
+        <button className="btn" style={{width:'100%',margin:'8px 0 4px',fontSize:12,padding:'7px'}}
+          onClick={()=>setModal({type:'cat',data:{id:null,name:'',icon:'📦',color:'#6B7280'}})}>
+          + Nuova categoria
+        </button>
+      </div>
+      <div className="section-title" style={{marginBottom:10}}>⚙️ Azioni</div>
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <button className="btn" style={{textAlign:'left',padding:'12px 16px'}} onClick={()=>setShowShare(true)}>
+          👥 Condividi dispensa
+        </button>
+        <button className="btn" style={{textAlign:'left',padding:'12px 16px'}} onClick={()=>{
+          const d=JSON.stringify({categories:cats,products:prods,spesaManuale:spesa,persone,valigie,valigieProdotti:valProd},null,2);
+          const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([d],{type:'application/json'})); a.download='camperhub-dispensa.json'; a.click();
+        }}>📤 Esporta dati JSON</button>
+        <button className="btn" style={{textAlign:'left',padding:'12px 16px',color:'var(--red)',borderColor:'rgba(240,96,96,.3)'}}
+          onClick={()=>{ if(!confirm('Eliminare TUTTI i dati dispensa e ripristinare i predefiniti?'))return;
+            upd({categories:DISP_CATS_DEFAULT,products:mkDispProds(),spesaManuale:[],persone:DISP_PERS_DEFAULT,valigie:[],valigieProdotti:[]});
+          }}>
+          🗑️ Reset completo
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── MODALS ────────────────────────────────────────────────────────────
+  const renderModal = () => {
+    if(!modal) return null;
+    const {type,data} = modal;
+    const setData = k => v => setModal(m=>({...m,data:{...m.data,[k]:v}}));
+
+    if(type==='prod'){
+      const p=data;
+      return(
+        <Modal title={p.id?'Modifica Prodotto':'Nuovo Prodotto'} onClose={()=>setModal(null)} width="460px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={p.name} onChange={e=>setData('name')(e.target.value)} placeholder="Nome prodotto"/>
+            </div>
+            <div className="field">
+              <label className="field-label">Categoria</label>
+              <select className="field-input" value={p.cat} onChange={e=>setData('cat')(e.target.value)}>
+                {cats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label className="field-label">Quantità</label>
+              <input className="field-input" value={p.qty||''} onChange={e=>setData('qty')(e.target.value)} placeholder="es. 2 pz"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Note</label>
+              <input className="field-input" value={p.note||''} onChange={e=>setData('note')(e.target.value)} placeholder="Note opzionali"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Stato scorte</label>
+              <div style={{display:'flex',gap:8}}>
+                {['ok','low','out'].map(s=>(
+                  <button key={s} className={`ds-status ${dsStatusClass(s)}`}
+                    style={{flex:1,opacity:p.status===s?1:0.3}} onClick={()=>setData('status')(s)}>
+                    {dsStatusLabel(s)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:12}}>
+              <label style={{fontSize:13,flex:1}}>🛒 Da acquistare</label>
+              <button className={`btn${p.toBuy?' btn-primary':''}`} style={{padding:'5px 12px',fontSize:12}} onClick={()=>setData('toBuy')(!p.toBuy)}>{p.toBuy?'✓ Sì':'No'}</button>
+            </div>
+            {p.id&&<div className="field" style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:12}}>
+              <label style={{fontSize:13,flex:1}}>⏸️ Prodotto attivo</label>
+              <button className={`btn${!p.disabled?' btn-primary':''}`} style={{padding:'5px 12px',fontSize:12}} onClick={()=>setData('disabled')(!p.disabled)}>{!p.disabled?'Attivo':'Disattivato'}</button>
+            </div>}
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{if(!p.name.trim()){alert('Inserisci il nome');return;}saveProd(p);}}>✓ Salva</button>
+            {p.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delProd(p.id)}>🗑️</button>}
+            <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      );
+    }
+
+    if(type==='catManage') return(
+      <Modal title="⚙️ Categorie" onClose={()=>setModal(null)} width="460px">
+        {cats.map(c=>(
+          <div key={c.id} className="ds-row">
+            <span style={{fontSize:18}}>{c.icon}</span>
+            <span style={{flex:1,fontSize:13}}>{c.name}</span>
+            <button className="btn-icon btn-sm" onClick={()=>setModal({type:'cat',data:{...c},prev:'catManage'})}>✏️</button>
+          </div>
+        ))}
+        <div className="btn-row" style={{marginTop:12}}>
+          <button className="btn-primary" onClick={()=>setModal({type:'cat',data:{id:null,name:'',icon:'📦',color:'#6B7280'},prev:'catManage'})}>+ Nuova</button>
+          <button className="btn" onClick={()=>setModal(null)}>Chiudi</button>
+        </div>
+      </Modal>
+    );
+
+    if(type==='cat'){
+      const c=data;
+      return(
+        <Modal title={c.id?'Modifica Categoria':'Nuova Categoria'} onClose={()=>setModal(null)} width="460px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={c.name} onChange={e=>setData('name')(e.target.value)} placeholder="Nome categoria"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Icona</label>
+              <div style={{display:'flex',flexWrap:'wrap',gap:5,maxHeight:130,overflowY:'auto'}}>
+                {DISP_EMOJIS.map(em=>(
+                  <button key={em} onClick={()=>setData('icon')(em)}
+                    style={{fontSize:20,padding:'5px',borderRadius:8,border:'2px solid '+(c.icon===em?'var(--primary)':'var(--border)'),background:c.icon===em?'var(--primary-faint)':'var(--card)',cursor:'pointer'}}>
+                    {em}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{if(!c.name.trim()){alert('Inserisci il nome');return;}saveCat(c);}}>✓ Salva</button>
+            {c.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delCat(c.id)}>🗑️</button>}
+            <button className="btn" onClick={()=>modal.prev?setModal({type:modal.prev}):setModal(null)}>← Indietro</button>
+          </div>
+        </Modal>
+      );
+    }
+
+    if(type==='persona'){
+      const p=data;
+      return(
+        <Modal title={p.id?'Modifica Persona':'Nuova Persona'} onClose={()=>setModal(null)} width="400px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={p.nome} onChange={e=>setData('nome')(e.target.value)} placeholder="Nome"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Colore</label>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {DISP_COLORS.map(col=>(
+                  <div key={col} onClick={()=>setData('colore')(col)}
+                    style={{width:28,height:28,borderRadius:14,background:col,cursor:'pointer',
+                      border:'3px solid '+(p.colore===col?'#fff':'transparent'),
+                      boxShadow:p.colore===col?'0 0 0 2px '+col:'none'}}/>
+                ))}
+              </div>
+            </div>
+            {p.id&&<div className="field" style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:12}}>
+              <label style={{fontSize:13,flex:1}}>Persona attiva</label>
+              <button className={`btn${!p.disabled?' btn-primary':''}`} style={{padding:'5px 12px',fontSize:12}} onClick={()=>setData('disabled')(!p.disabled)}>{!p.disabled?'Attiva':'Disattivata'}</button>
+            </div>}
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{if(!p.nome.trim()){alert('Inserisci il nome');return;}savePersona(p);}}>✓ Salva</button>
+            {p.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delPersona(p.id)}>🗑️</button>}
+            <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      );
+    }
+
+    if(type==='valigia'){
+      const v=data;
+      return(
+        <Modal title={v.id?'Modifica Valigia':'Nuova Valigia'} onClose={()=>setModal(null)} width="400px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={v.nome} onChange={e=>setData('nome')(e.target.value)} placeholder="es. Valigia grande, Zaino..."/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Icona</label>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {DISP_BAG_ICONS.map(ic=>(
+                  <button key={ic} onClick={()=>setData('icon')(ic)}
+                    style={{fontSize:22,padding:'6px',borderRadius:8,border:'2px solid '+(v.icon===ic?'var(--primary)':'var(--border)'),background:v.icon===ic?'var(--primary-faint)':'var(--card)',cursor:'pointer'}}>
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{if(!v.nome.trim()){alert('Inserisci il nome');return;}saveValigia(v);}}>✓ Salva</button>
+            {v.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delValigia(v.id)}>🗑️</button>}
+            <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      );
+    }
+
+    if(type==='vpItem'){
+      const item=data;
+      return(
+        <Modal title={item.id?'Modifica Articolo':'Nuovo Articolo'} onClose={()=>setModal(null)} width="400px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={item.name} onChange={e=>setData('name')(e.target.value)} placeholder="Nome articolo"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Note</label>
+              <input className="field-input" value={item.note||''} onChange={e=>setData('note')(e.target.value)} placeholder="Note opzionali"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Stato</label>
+              <div style={{display:'flex',gap:8}}>
+                {['ok','low','out'].map(s=>(
+                  <button key={s} className={`ds-status ${dsStatusClass(s)}`}
+                    style={{flex:1,opacity:item.status===s?1:0.3}} onClick={()=>setData('status')(s)}>
+                    {dsStatusLabel(s)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{if(!item.name.trim()){alert('Inserisci il nome');return;}saveVP(item);}}>✓ Salva</button>
+            {item.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delVP(item.id)}>🗑️</button>}
+            <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      );
+    }
+    return null;
+  };
+
+  const TABS=[['inventario','📦','Inventario'],['spesa','🛒','Spesa'],['portare','🏠','Portare'],['valigie','🧳','Valigie'],['impostazioni','⚙️','Impost.']];
+  return(
+    <div>
+      {/* Header */}
+      <div className="app-header" style={{height:'auto',flexDirection:'column',alignItems:'stretch',padding:'8px 12px',gap:6}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="btn-icon" onClick={onBack} style={{flexShrink:0}}>←</button>
+          <div className="logo" style={{fontSize:15,flex:1}}>🎒 <strong>Dispensa Camper</strong></div>
+          <button className="btn-icon" onClick={()=>setShowShare(true)} title="Condividi">👥</button>
+        </div>
+        <div style={{display:'flex',gap:4,overflowX:'auto',paddingBottom:2}}>
+          {TABS.map(([t,ic,label])=>(
+            <button key={t} className={`btn-tab${tab===t?' active':''}`} onClick={()=>setTab(t)}
+              style={{flexShrink:0,padding:'5px 8px',fontSize:11}}>{ic} {label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="container">
+        {tab==='inventario' && <TabInventario/>}
+        {tab==='spesa'      && <TabSpesa/>}
+        {tab==='portare'    && <TabPortare/>}
+        {tab==='valigie'    && <TabValigie/>}
+        {tab==='impostazioni' && <TabImpostazioni/>}
+      </div>
+
+      {/* Modals */}
+      {renderModal()}
+      {showShare && <DispensaShareModal dispensa={dispensa} dispensaId={dispensaId} user={user} onClose={()=>setShowShare(false)}/>}
+    </div>
+  );
+}
+
+// ── Home View / App ────────────────────────────────────────────────────────
+function App(){
+  const [user,setUser]         = React.useState(undefined);
+  const [viaggi,setViaggi]     = React.useState([]);
+  const [dispensa,setDispensa] = React.useState(null);
+  const [dispId,setDispId]     = React.useState(null);
+  const [activeId,setActiveId] = React.useState(null);
+  const [showDisp,setShowDisp] = React.useState(false);
+  const [showNew,setNew]       = React.useState(false);
+  const [delId,setDel]         = React.useState(null);
+  const [showShare,setShare]   = React.useState(null);
+
   React.useEffect(()=>{
     return firebase.auth().onAuthStateChanged(u=>setUser(u||null));
   },[]);
 
-  // Firestore listener — subscribe when user logs in
   React.useEffect(()=>{
     if(user===undefined) return;
-    if(!user){ setViaggi([]); return; }
-    // Save/update user profile for lookup by others
+    if(!user){ setViaggi([]); setDispensa(null); setDispId(null); return; }
+    // Salva profilo utente
     firebase.firestore().collection('users').doc(user.uid)
       .set({email:user.email.toLowerCase(), displayName:user.displayName||user.email},{merge:true});
-    // Subscribe to all trips where user is a member
-    const unsub = firebase.firestore().collection('viaggi')
+    // Listener viaggi
+    const unsubV = firebase.firestore().collection('viaggi')
       .where('members','array-contains',user.uid)
       .onSnapshot(snap=>{
-        const list = snap.docs.map(d=>({...d.data(), id:d.id}));
+        const list = snap.docs.map(d=>({...d.data(),id:d.id}));
         list.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         setViaggi(list);
-      }, err=>console.error('Firestore err:',err));
-    return unsub;
+      }, err=>console.error('viaggi err:',err));
+    // Listener dispensa
+    const unsubD = firebase.firestore().collection('dispensa')
+      .where('members','array-contains',user.uid)
+      .onSnapshot(async snap=>{
+        if(snap.empty){
+          try {
+            const doc = mkDispensaDoc(user.uid, user.email.toLowerCase());
+            const ref = await firebase.firestore().collection('dispensa').add({
+              ...doc, createdAt:firebase.firestore.FieldValue.serverTimestamp()
+            });
+            setDispId(ref.id); setDispensa(doc);
+          } catch(e){ console.error('creaDispensa err:',e); }
+        } else {
+          setDispId(snap.docs[0].id);
+          setDispensa(snap.docs[0].data());
+        }
+      }, err=>console.error('dispensa err:',err));
+    return ()=>{ unsubV(); unsubD(); };
   },[user]);
 
   const updateTrip = t => {
-    const {id,...data} = t;
-    firebase.firestore().collection('viaggi').doc(id).update(data)
-      .catch(e=>console.error('updateTrip:',e));
+    const {id,...data}=t;
+    firebase.firestore().collection('viaggi').doc(id).update(data).catch(e=>console.error(e));
   };
-
   const addTrip = form => {
-    const trip = createTrip(form);
-    const {id:_,...data} = trip;
+    const trip=createTrip(form); const {id:_,...data}=trip;
     firebase.firestore().collection('viaggi').add({
-      ...data,
-      ownerId:      user.uid,
-      members:      [user.uid],
-      memberEmails: [user.email.toLowerCase()],
-      createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
-    }).catch(e=>console.error('addTrip:',e));
+      ...data, ownerId:user.uid, members:[user.uid],
+      memberEmails:[user.email.toLowerCase()],
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+    }).catch(e=>console.error(e));
   };
-
-  const removeTrip = id => {
-    firebase.firestore().collection('viaggi').doc(id).delete()
-      .catch(e=>console.error('removeTrip:',e));
+  const removeTrip = id => firebase.firestore().collection('viaggi').doc(id).delete().catch(e=>console.error(e));
+  const updateDispensa = data => {
+    if(!dispId) return;
+    const {id:_,createdAt:__,...rest}=data;
+    firebase.firestore().collection('dispensa').doc(dispId).update(rest).catch(e=>console.error(e));
   };
-
   const signOut = () => firebase.auth().signOut();
 
-  // ── Loading ──
-  if(user===undefined) return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",
-      height:"100vh",flexDirection:"column",gap:14,background:"var(--bg)"}}>
+  // Loading
+  if(user===undefined) return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:14,background:'var(--bg)'}}>
       <div style={{fontSize:40}}>🚐</div>
-      <div style={{color:"var(--text2)",fontSize:13}}>Caricamento...</div>
+      <div style={{color:'var(--text2)',fontSize:13}}>Caricamento...</div>
     </div>
   );
 
-  // ── Not logged in ──
   if(!user) return <LoginScreen/>;
 
-  // ── Trip view ──
+  // Dispensa view
+  if(showDisp && dispensa) return(
+    <DispensaView dispensa={dispensa} dispensaId={dispId} updateDispensa={updateDispensa} user={user} onBack={()=>setShowDisp(false)}/>
+  );
+
+  // Trip view
   if(activeId){
-    const v = viaggi.find(x=>x.id===activeId);
+    const v=viaggi.find(x=>x.id===activeId);
     if(!v){ setActiveId(null); return null; }
-    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)}
-                     user={user} onShare={()=>setShare(v)}/>;
+    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)}/>;
   }
 
-  // ── Home ──
-  return (
+  // Home
+  const dispStats = dispensa ? {
+    tot:(dispensa.products||[]).filter(p=>!p.disabled).length,
+    low:(dispensa.products||[]).filter(p=>!p.disabled&&p.status==='low').length,
+    out:(dispensa.products||[]).filter(p=>!p.disabled&&p.status==='out').length,
+    buy:(dispensa.products||[]).filter(p=>!p.disabled&&p.toBuy).length,
+  } : null;
+
+  return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>Viaggi Camper</strong> <span>v6.8</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v7.0</span></div>
         <div className="header-actions">
-          <span style={{fontSize:11,color:"var(--text2)",maxWidth:120,overflow:"hidden",
-            textOverflow:"ellipsis",whiteSpace:"nowrap",display:"none"}} className="user-email">
-            {user.email}
-          </span>
-          <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
-          <button className="btn-icon" onClick={signOut} title="Esci dall'account" style={{fontSize:16}}>⏻</button>
+          <button className="btn-primary" onClick={()=>setNew(true)}>＋ Viaggio</button>
+          <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>⏻</button>
         </div>
       </div>
 
       <div className="container">
-        {/* User email strip */}
-        <div style={{fontSize:11,color:"var(--text3)",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
-          <span>👤</span>
-          <span>{user.email}</span>
+        <div style={{fontSize:11,color:'var(--text3)',marginBottom:12,display:'flex',alignItems:'center',gap:6}}>
+          <span>👤</span><span>{user.email}</span>
         </div>
 
-        {viaggi.length===0 && (
-          <div className="empty" style={{paddingTop:60}}>
+        {/* Card Dispensa */}
+        <div className="ds-hub-card" onClick={()=>setShowDisp(true)}>
+          <div style={{fontSize:32,flexShrink:0}}>🎒</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:700,color:'var(--primary)',fontFamily:"'Syne',sans-serif"}}>Dispensa Camper</div>
+            {dispStats
+              ? <div style={{fontSize:12,color:'var(--text2)',marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <span>{dispStats.tot} prodotti</span>
+                  {dispStats.low>0&&<span style={{color:'var(--accent)'}}>⚠️ {dispStats.low} scarsi</span>}
+                  {dispStats.out>0&&<span style={{color:'var(--red)'}}>❌ {dispStats.out} mancanti</span>}
+                  {dispStats.buy>0&&<span style={{color:'var(--primary)'}}>🛒 {dispStats.buy} da comprare</span>}
+                </div>
+              : <div style={{fontSize:12,color:'var(--text3)'}}>Caricamento...</div>
+            }
+          </div>
+          <span style={{color:'var(--text3)',fontSize:22}}>›</span>
+        </div>
+
+        {/* Viaggi */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          <div style={{fontSize:11,color:'var(--text3)',fontWeight:600,letterSpacing:.5}}>✈️ I MIEI VIAGGI</div>
+        </div>
+
+        {viaggi.length===0&&(
+          <div className="empty" style={{paddingTop:40}}>
             <div className="empty-icon">🚐</div>
-            <p style={{marginBottom:16,color:"var(--text2)"}}>Nessun viaggio ancora. Crea il tuo primo!</p>
+            <p style={{marginBottom:16,color:'var(--text2)'}}>Nessun viaggio ancora. Crea il tuo primo!</p>
             <button className="btn-primary" onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
           </div>
         )}
 
         <div className="trips-grid">
           {viaggi.map(v=>{
-            const giorni  = diffInclusive(v.startDate,v.endDate);
-            const stats   = getStats(v.consuntivo||[], v.budget);
-            const hasData = (v.consuntivo||[]).some(d=>calcCosto(d)>0);
-            const isShared = (v.members||[]).length > 1;
-            return (
+            const giorni=diffInclusive(v.startDate,v.endDate);
+            const stats=getStats(v.consuntivo||[], v.budget);
+            const hasData=(v.consuntivo||[]).some(d=>calcCosto(d)>0);
+            const isShared=(v.members||[]).length>1;
+            return(
               <div key={v.id} className="trip-card" onClick={()=>setActiveId(v.id)}>
                 <div className="trip-card-name">
                   {v.nome}
-                  {isShared && <span className="badge accent" style={{fontSize:10,marginLeft:6}}>👥</span>}
+                  {isShared&&<span className="badge accent" style={{fontSize:10,marginLeft:6}}>👥</span>}
                 </div>
                 <div className="trip-card-meta">
                   <span>📅 {fmtDate(v.startDate)} → {fmtDate(v.endDate)}</span>
@@ -2152,19 +2891,15 @@ function App(){
                 </div>
                 <div className="trip-card-budget">
                   <strong>{fmt2(n(v.budget))}</strong>
-                  <span style={{fontSize:12,color:"var(--text2)"}}>budget iniziale</span>
-                  {hasData && <span style={{fontSize:12,color:stats.residuo>=0?"var(--green)":"var(--red)",marginLeft:"auto"}}>
+                  <span style={{fontSize:12,color:'var(--text2)'}}>budget iniziale</span>
+                  {hasData&&<span style={{fontSize:12,color:stats.residuo>=0?'var(--green)':'var(--red)',marginLeft:'auto'}}>
                     residuo: €{fmt2(stats.residuo)}
                   </span>}
                 </div>
                 <div className="trip-card-actions" onClick={e=>e.stopPropagation()}>
                   <button className="btn-icon btn-sm" onClick={()=>setActiveId(v.id)}>✏️ Apri</button>
-                  <button className="btn-icon btn-sm" style={{color:"var(--primary)"}}
-                    onClick={()=>setShare(v)} title="Condividi">👥</button>
-                  {v.ownerId===user.uid && (
-                    <button className="btn-icon btn-sm" style={{color:"var(--red)"}}
-                      onClick={()=>setDel(v.id)}>🗑</button>
-                  )}
+                  <button className="btn-icon btn-sm" style={{color:'var(--primary)'}} onClick={()=>setShare(v)} title="Condividi">👥</button>
+                  {v.ownerId===user.uid&&<button className="btn-icon btn-sm" style={{color:'var(--red)'}} onClick={()=>setDel(v.id)}>🗑</button>}
                 </div>
               </div>
             );
@@ -2175,23 +2910,12 @@ function App(){
         </div>
       </div>
 
-      {showNew && (
-        <TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)}
-          onSave={f=>{ addTrip(f); setNew(false); }}/>
-      )}
-      {delId && (
-        <Confirm
-          msg={`Eliminare il viaggio "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`}
-          onOk={()=>{ removeTrip(delId); setDel(null); }}
-          onClose={()=>setDel(null)}/>
-      )}
-      {showShare && (
-        <ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>
-      )}
+      {showNew&&<TripFormModal title="Nuovo viaggio" onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
+      {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`} onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
+      {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
     </div>
   );
 }
-
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
