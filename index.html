@@ -2187,30 +2187,31 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const toggleManual= id => upd({spesaManuale:spesa.map(s=>s.id===id?{...s,done:!s.done}:s)});
   const removeManual= id => upd({spesaManuale:spesa.filter(s=>s.id!==id)});
 
-  const filteredProds = React.useMemo(()=>{
-    let r=prods.filter(p=>!p.disabled);
-    if(selCat!=='all') r=r.filter(p=>p.cat===selCat);
-    if(invFil==='low')  r=r.filter(p=>p.status==='low');
-    else if(invFil==='out') r=r.filter(p=>p.status==='out');
-    else if(invFil==='buy') r=r.filter(p=>p.toBuy);
-    return r.sort((a,b)=>a.name.localeCompare(b.name,'it'));
-  },[prods,selCat,invFil]);
+  // Calcolo diretto senza useMemo per evitare problemi di dipendenze
+  const activeProds = prods.filter(p=>!p.disabled);
+  let filteredProds = selCat==='all' ? activeProds : activeProds.filter(p=>p.cat===selCat);
+  if(invFil==='low')       filteredProds = filteredProds.filter(p=>p.status==='low');
+  else if(invFil==='out')  filteredProds = filteredProds.filter(p=>p.status==='out');
+  else if(invFil==='buy')  filteredProds = filteredProds.filter(p=>p.toBuy);
+  filteredProds = [...filteredProds].sort((a,b)=>a.name.localeCompare(b.name,'it'));
+  const statsOk  = activeProds.filter(p=>p.status==='ok').length;
+  const statsLow = activeProds.filter(p=>p.status==='low').length;
+  const statsOut = activeProds.filter(p=>p.status==='out').length;
+  const statsBuy = activeProds.filter(p=>p.toBuy).length;
+
 
   // ── TAB: INVENTARIO ───────────────────────────────────────────────────
   const TabInventario = () => {
-    const active=prods.filter(p=>!p.disabled);
-    const ok=active.filter(p=>p.status==='ok').length;
-    const low=active.filter(p=>p.status==='low').length;
-    const out=active.filter(p=>p.status==='out').length;
-    const buy=active.filter(p=>p.toBuy).length;
     return (
       <div>
         {/* Statistiche rapide */}
-        <div className="card-sm" style={{display:'flex',justifyContent:'space-around',padding:'12px 4px',marginBottom:12}}>
-          {[[active.length,'var(--text)','TOTALE','all','all'],[low,'var(--accent)','⚠️ SCARSO','all','low'],[out,'var(--red)','❌ MANCANTE','all','out'],[buy,'var(--primary)','🛒 DA COMP.','all','buy']].map(([num,col,lbl,cat,fil])=>(
-            <div key={lbl} onClick={()=>{setSelCat(cat);setInvFil(fil);}} style={{textAlign:'center',cursor:'pointer'}}>
-              <div style={{fontSize:22,fontWeight:800,fontFamily:"'Syne',sans-serif",color:col,lineHeight:1}}>{num}</div>
-              <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginTop:3}}>{lbl}</div>
+        <div className="card-sm" style={{display:'flex',justifyContent:'space-around',padding:'16px 8px',marginBottom:14,gap:4}}>
+          {[[activeProds.length,'var(--text)','TOTALE','all','all'],[statsLow,'var(--accent)','⚠️ SCARSO','all','low'],[statsOut,'var(--red)','❌ MANCANTE','all','out'],[statsBuy,'var(--primary)','🛒 DA COMP.','all','buy']].map(([num,col,lbl,cat,fil])=>(
+            <div key={lbl} onClick={()=>{setSelCat(cat);setInvFil(fil);}}
+              style={{textAlign:'center',cursor:'pointer',flex:1,padding:'8px 4px',borderRadius:10,
+                background:(selCat===cat&&invFil===fil)?`rgba(${hexRgb(col==='var(--text)'?'#d8eee4':col.replace('var(--accent)','#f0a045').replace('var(--red)','#f06060').replace('var(--primary)','#4fd8b4'))},.1)`:'transparent'}}>
+              <div style={{fontSize:26,fontWeight:800,fontFamily:"'Syne',sans-serif",color:col,lineHeight:1}}>{num}</div>
+              <div style={{fontSize:10,color:'var(--text3)',fontWeight:600,marginTop:4}}>{lbl}</div>
             </div>
           ))}
         </div>
@@ -2479,6 +2480,30 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
           const d=JSON.stringify({categories:cats,products:prods,spesaManuale:spesa,persone,valigie,valigieProdotti:valProd},null,2);
           const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([d],{type:'application/json'})); a.download='camperhub-dispensa.json'; a.click();
         }}>📤 Esporta dati JSON</button>
+        <button className="btn" style={{textAlign:'left',padding:'12px 16px'}} onClick={()=>{
+          const inp=document.createElement('input'); inp.type='file'; inp.accept='.json';
+          inp.onchange=e=>{
+            const file=e.target.files[0]; if(!file) return;
+            const reader=new FileReader();
+            reader.onload=ev=>{
+              try{
+                const d=JSON.parse(ev.target.result);
+                if(!confirm('Importare i dati? Verranno sovrascritti i dati attuali.')) return;
+                upd({
+                  categories: d.categories || cats,
+                  products:   d.products   || prods,
+                  spesaManuale: d.spesaManuale || spesa,
+                  persone:    d.persone    || persone,
+                  valigie:    d.valigie    || valigie,
+                  valigieProdotti: d.valigieProdotti || valProd,
+                });
+                alert('Importazione completata!');
+              }catch(err){ alert('Errore nel file: '+err.message); }
+            };
+            reader.readAsText(file);
+          };
+          inp.click();
+        }}>📥 Importa dati JSON</button>
         <button className="btn" style={{textAlign:'left',padding:'12px 16px',color:'var(--red)',borderColor:'rgba(240,96,96,.3)'}}
           onClick={()=>{ if(!confirm('Eliminare TUTTI i dati dispensa e ripristinare i predefiniti?'))return;
             upd({categories:DISP_CATS_DEFAULT,products:mkDispProds(),spesaManuale:[],persone:DISP_PERS_DEFAULT,valigie:[],valigieProdotti:[]});
