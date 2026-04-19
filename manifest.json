@@ -1,19 +1,56 @@
 {
-  "name": "CamperHub",
-  "short_name": "CamperHub",
-  "description": "Gestione viaggi e dispensa per il tuo camper",
-  "start_url": "./",
-  "scope": "./",
+  "name": "MoneyTracker 8.0",
+  "short_name": "MoneyTracker",
+  "description": "Gestione spese personali e familiari",
+  "start_url": "/MoneyTracker7.0/",
+  "scope": "/MoneyTracker7.0/",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#0c1210",
-  "theme_color": "#0c1210",
+  "orientation": "portrait",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
   "lang": "it",
-  "categories": ["travel", "lifestyle"],
   "icons": [
-    {"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
-    {"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
-    {"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+    {
+      "src": "icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
