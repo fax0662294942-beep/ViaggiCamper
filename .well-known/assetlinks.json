@@ -1,8 +1,8 @@
-
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "com.franco.viaggicamper",
-        "sha256_cert_fingerprints": ["11:E2:C8:4B:19:D4:62:E4:91:FD:B5:E7:7B:B8:E1:3B:4D:F6:58:F4:6F:35:2A:06:C8:08:7E:B4:3B:26:79:45"]
-      }
-    }]
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.franco.viaggicamper",
+    "sha256_cert_fingerprints": ["99:7D:1B:F6:AA:08:D4:F5:3F:6E:EF:90:EF:A7:E9:66:9E:44:01:56:B1:CB:00:AB:31:FD:64:77:C6:9C:31:7D"]
+  }
+}]
