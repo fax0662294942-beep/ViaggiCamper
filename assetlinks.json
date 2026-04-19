@@ -1,8 +1,0 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "com.franco.viaggicamper",
-    "sha256_cert_fingerprints": ["99:7D:1B:F6:AA:08:D4:F5:3F:6E:EF:90:EF:A7:E9:66:9E:44:01:56:B1:CB:00:AB:31:FD:64:77:C6:9C:31:7D"]
-  }
-}]
