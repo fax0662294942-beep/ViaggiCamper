@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.2</title>
+<title>🚐 CamperHub v8.3</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2428,11 +2428,16 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
 
   // Calcolo diretto senza useMemo per evitare problemi di dipendenze
   const activeProds = prods.filter(p=>!p.disabled);
-  let filteredProds = selCat==='all' ? activeProds : activeProds.filter(p=>p.cat===selCat);
-  if(invFil==='low')       filteredProds = filteredProds.filter(p=>p.status==='low');
-  else if(invFil==='out')  filteredProds = filteredProds.filter(p=>p.status==='out');
-  else if(invFil==='buy')  filteredProds = filteredProds.filter(p=>p.toBuy);
-  filteredProds = [...filteredProds].sort((a,b)=>a.name.localeCompare(b.name,'it'));
+  // Prodotti da mostrare: attivi filtrati + disattivati in fondo (sempre visibili ma oscurati)
+  let filteredProds = selCat==='all' ? prods : prods.filter(p=>p.cat===selCat);
+  if(invFil==='low')       filteredProds = filteredProds.filter(p=>p.status==='low'&&!p.disabled);
+  else if(invFil==='out')  filteredProds = filteredProds.filter(p=>p.status==='out'&&!p.disabled);
+  else if(invFil==='buy')  filteredProds = filteredProds.filter(p=>p.toBuy&&!p.disabled);
+  // Ordina: attivi prima, disattivati in fondo
+  filteredProds = [...filteredProds].sort((a,b)=>{
+    if(a.disabled !== b.disabled) return a.disabled ? 1 : -1;
+    return a.name.localeCompare(b.name,'it');
+  });
   const statsOk  = activeProds.filter(p=>p.status==='ok').length;
   const statsLow = activeProds.filter(p=>p.status==='low').length;
   const statsOut = activeProds.filter(p=>p.status==='out').length;
@@ -2492,17 +2497,24 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
               {filteredProds.map(p=>{
                 const cat=cats.find(c=>c.id===p.cat);
                 return (
-                  <div key={p.id} className="ds-row">
+                  <div key={p.id} className="ds-row" style={{opacity:p.disabled?0.4:1}}>
                     <span style={{fontSize:16,flexShrink:0}}>{cat?.icon||'📦'}</span>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
-                      {(p.qty||p.note)&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
+                      <div style={{fontSize:13,fontWeight:500,textDecoration:p.disabled?'line-through':'none'}}>{p.name}</div>
+                      {(p.qty||p.note)&&!p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
+                      {p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>disattivato</div>}
                     </div>
-                    <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
-                      {dsStatusLabel(p.status||'ok')}
-                    </button>
-                    <button className="btn-icon btn-sm" title={p.toBuy?'Togli da spesa':'Aggiungi a spesa'}
-                      style={{color:p.toBuy?'var(--primary)':'var(--text3)',fontSize:15}} onClick={()=>toggleBuy(p.id)}>🛒</button>
+                    {!p.disabled && <>
+                      <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
+                        {dsStatusLabel(p.status||'ok')}
+                      </button>
+                      <button className="btn-icon btn-sm" title="Aggiungi a spesa"
+                        style={{color:p.toBuy?'var(--primary)':'var(--text3)',fontSize:15}} onClick={()=>toggleBuy(p.id)}>🛒</button>
+                    </>}
+                    {p.disabled && (
+                      <button className="btn btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--primary)'}}
+                        onClick={()=>setModal({type:'prod',data:{...p}})}>riattiva</button>
+                    )}
                     <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
                   </div>
                 );
@@ -3116,7 +3128,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v8.2</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v8.3</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
