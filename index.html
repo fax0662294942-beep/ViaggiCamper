@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.3</title>
+<title>🚐 CamperHub v8.4</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2508,8 +2508,13 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                       <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
                         {dsStatusLabel(p.status||'ok')}
                       </button>
-                      <button className="btn-icon btn-sm" title="Aggiungi a spesa"
-                        style={{color:p.toBuy?'var(--primary)':'var(--text3)',fontSize:15}} onClick={()=>toggleBuy(p.id)}>🛒</button>
+                      <button onClick={()=>toggleBuy(p.id)}
+                        style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:12,border:'1.5px solid',cursor:'pointer',whiteSpace:'nowrap',
+                          background:p.toBuy?'rgba(79,216,180,.15)':'transparent',
+                          color:p.toBuy?'var(--primary)':'var(--text3)',
+                          borderColor:p.toBuy?'var(--primary)':'transparent'}}>
+                        🛒{p.toBuy?' Spesa':''}
+                      </button>
                     </>}
                     {p.disabled && (
                       <button className="btn btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--primary)'}}
@@ -2761,6 +2766,9 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
           }}>
           🗑️ Reset completo
         </button>
+      </div>
+      <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
+        CamperHub v8.4 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -3128,7 +3136,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v8.3</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v8.4</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
