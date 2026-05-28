@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.4</title>
+<title>🚐 CamperHub v8.5</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2387,7 +2387,13 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const spesa       = dispensa.spesaManuale   || [];
   const persone     = dispensa.persone        || DISP_PERS_DEFAULT;
   const valigie     = dispensa.valigie        || [];
-  const valProd     = dispensa.valigieProdotti|| [];
+  // Migrazione automatica: vecchio formato {valigiaId, status:string} → nuovo {valigie:[], status:{}, disabled:{}}
+  const valProd = (dispensa.valigieProdotti||[]).map(i=> i.valigie ? i : {
+    ...i,
+    valigie:  i.valigiaId ? [{id:i.valigiaId, qty:i.qty||''}] : [],
+    status:   typeof i.status   === 'string' ? {} : (i.status  ||{}),
+    disabled: typeof i.disabled === 'boolean'? {} : (i.disabled||{}),
+  });
 
   const [tab,setTab]           = React.useState('inventario');
   const [selCat,setSelCat]     = React.useState('all');
@@ -2395,6 +2401,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const [portareOk,setPortareOk] = React.useState({});
   const [persId,setPersId]     = React.useState(null);
   const [expandV,setExpandV]   = React.useState(null);
+  const [valigieTab,setValigieTab] = React.useState('list');
   const [manInp,setManInp]     = React.useState('');
   const [showShare,setShowShare]= React.useState(false);
   // modals: null | {type, data}
@@ -2412,15 +2419,28 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const saveCat = c => { upd({categories: c.id&&cats.find(x=>x.id===c.id) ? cats.map(x=>x.id===c.id?c:x) : [...cats,{...c,id:'cat_'+Date.now()}]}); setModal(null); };
   const delCat  = id => { if(prods.some(p=>p.cat===id)){alert('Sposta prima i prodotti da questa categoria.');return;} if(!confirm('Eliminare la categoria?'))return; upd({categories:cats.filter(c=>c.id!==id)}); setModal(null); };
 
-  const saveValigia = v => { upd({valigie: v.id&&valigie.find(x=>x.id===v.id) ? valigie.map(x=>x.id===v.id?v:x) : [...valigie,{...v,id:'v_'+Date.now(),personaId:activePers}]}); setModal(null); };
-  const delValigia  = id => { if(!confirm('Eliminare valigia e contenuto?'))return; upd({valigie:valigie.filter(v=>v.id!==id), valigieProdotti:valProd.filter(vp=>vp.valigiaId!==id)}); setModal(null); };
+  const saveValigia = v => { upd({valigie: v.id&&valigie.find(x=>x.id===v.id) ? valigie.map(x=>x.id===v.id?v:x) : [...valigie,{...v,id:'v_'+Date.now(),personaId:activePers,active:true}]}); setModal(null); };
+  const delValigia  = id => {
+    if(!confirm('Eliminare valigia?'))return;
+    const newVP = valProd.map(vp=>{const nv=vp.valigie.filter(x=>x.id!==id); return nv.length?{...vp,valigie:nv}:null;}).filter(Boolean);
+    upd({valigie:valigie.filter(v=>v.id!==id), valigieProdotti:newVP}); setModal(null);
+  };
+  const toggleVActive = id => upd({valigie: valigie.map(v=>v.id===id?{...v,active:v.active===false?true:false}:v)});
 
   const saveVP = vp => { upd({valigieProdotti: vp.id&&valProd.find(x=>x.id===vp.id) ? valProd.map(x=>x.id===vp.id?vp:x) : [...valProd,{...vp,id:'vp_'+Date.now()}]}); setModal(null); };
   const delVP  = id => { upd({valigieProdotti:valProd.filter(i=>i.id!==id)}); setModal(null); };
-  const toggleVPStatus = (id,s) => upd({valigieProdotti:valProd.map(i=>i.id===id?{...i,status:s}:i)});
+  const toggleVPStatusPers = (id,pid) => {
+    const cycle={ok:'low',low:'out',out:'ok'};
+    upd({valigieProdotti:valProd.map(i=>i.id===id?{...i,status:{...(i.status||{}),[pid]:cycle[((i.status||{})[pid])||'ok']}}:i)});
+  };
 
   const savePersona = p => { upd({persone: p.id&&persone.find(x=>x.id===p.id) ? persone.map(x=>x.id===p.id?p:x) : [...persone,{...p,id:'p_'+Date.now()}]}); setModal(null); };
-  const delPersona  = id => { if(!confirm('Eliminare persona e tutte le sue valigie?'))return; const vids=valigie.filter(v=>v.personaId===id).map(v=>v.id); upd({persone:persone.filter(p=>p.id!==id),valigie:valigie.filter(v=>v.personaId!==id),valigieProdotti:valProd.filter(vp=>!vids.includes(vp.valigiaId))}); setModal(null); };
+  const delPersona  = id => {
+    if(!confirm('Eliminare persona?'))return;
+    const vids=valigie.filter(v=>v.personaId===id).map(v=>v.id);
+    const newVP=valProd.map(vp=>{const nv=vp.valigie.filter(x=>!vids.includes(x.id));return nv.length?{...vp,valigie:nv}:null;}).filter(Boolean);
+    upd({persone:persone.filter(p=>p.id!==id),valigie:valigie.filter(v=>v.personaId!==id),valigieProdotti:newVP}); setModal(null);
+  };
 
   const addManual   = () => { if(!manInp.trim())return; upd({spesaManuale:[...spesa,{id:Date.now(),name:manInp.trim(),done:false}]}); setManInp(''); };
   const toggleManual= id => upd({spesaManuale:spesa.map(s=>s.id===id?{...s,done:!s.done}:s)});
@@ -2619,11 +2639,26 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
 
   // ── TAB: VALIGIE ──────────────────────────────────────────────────────
   const TabValigie = () => {
-    const activePersList=persone.filter(p=>!p.disabled);
-    const myV=valigie.filter(v=>v.personaId===activePers);
-    const currP=persone.find(p=>p.id===activePers);
+    const activePersList = persone.filter(p=>!p.disabled);
+    const currP = persone.find(p=>p.id===activePers);
+    const myV   = valigie.filter(v=>v.personaId===activePers);
+    const myActiveVIds = myV.filter(v=>v.active!==false).map(v=>v.id);
+
+    // Prodotti da preparare: in valigie attive, non-ok per activePers, non disabilitati per activePers
+    const daPreparare = valProd.filter(item=>
+      myActiveVIds.length>0 &&
+      item.valigie.some(v=>myActiveVIds.includes(v.id)) &&
+      !((item.disabled||{})[activePers]) &&
+      ((item.status||{})[activePers]||'ok') !== 'ok'
+    );
+
+    const statusIcon = s => s==='ok'?'✅':s==='low'?'⚠️':'❌';
+    const statusLabel= s => s==='ok'?'OK':s==='low'?'Scarso':'Mancante';
+    const statusClass= s => s==='ok'?'ds-ok':s==='low'?'ds-low':'ds-out';
+
     return(
       <div>
+        {/* Selettore persona */}
         {activePersList.length>1&&(
           <div style={{display:'flex',gap:8,overflowX:'auto',marginBottom:12,paddingBottom:2}}>
             {activePersList.map(p=>(
@@ -2636,61 +2671,131 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
             ))}
           </div>
         )}
-        <div className="card-sm" style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,padding:'12px 16px'}}>
-          <div>
-            <div style={{fontSize:14,fontWeight:700}}>{currP?.nome||'—'}</div>
-            <div style={{fontSize:11,color:'var(--text2)'}}>{myV.length} {myV.length===1?'valigia':'valigie'}</div>
-          </div>
-          <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}}
-            onClick={()=>setModal({type:'valigia',data:{id:null,nome:'',icon:'🧳',personaId:activePers}})}>+ Valigia</button>
+
+        {/* Sub-tabs */}
+        <div style={{display:'flex',gap:0,borderRadius:10,overflow:'hidden',border:'1px solid var(--border)',marginBottom:14}}>
+          {[['list','🧳 Valigie'],['prepare','📋 Da preparare']].map(([k,lbl])=>(
+            <button key={k} onClick={()=>setValigieTab(k)}
+              style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',
+                background:valigieTab===k?'var(--primary)':'var(--card)',
+                color:valigieTab===k?'var(--bg)':'var(--text2)',transition:'background .15s'}}>
+              {lbl}{k==='prepare'&&daPreparare.length>0?` (${daPreparare.length})`:''}
+            </button>
+          ))}
         </div>
-        {myV.length===0
-          ? <div className="empty"><div className="empty-icon">🧳</div><p>Nessuna valigia per {currP?.nome||'questa persona'}</p></div>
-          : myV.map(v=>{
-              const items=valProd.filter(i=>i.valigiaId===v.id&&!i.disabled);
-              const okC=items.filter(i=>i.status==='ok').length;
-              const isExp=expandV===v.id;
-              return(
-                <div key={v.id} className="card-sm" style={{marginBottom:10,padding:0,overflow:'hidden'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:isExp?'1px solid var(--border)':'none',cursor:'pointer'}}
-                    onClick={()=>setExpandV(isExp?null:v.id)}>
-                    <span style={{fontSize:20}}>{v.icon||'🧳'}</span>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:600}}>{v.nome}</div>
-                      <div style={{fontSize:11,color:items.length>0&&okC===items.length?'var(--green)':'var(--text2)'}}>
-                        {items.length===0?'vuota':`${okC}/${items.length} OK`}
-                      </div>
-                    </div>
-                    <button className="btn-icon btn-sm" style={{color:'var(--primary)'}}
-                      onClick={e=>{e.stopPropagation();setModal({type:'valigia',data:{...v}});}}>✏️</button>
-                    <span style={{color:'var(--text3)',fontSize:12}}>{isExp?'▲':'▼'}</span>
-                  </div>
-                  {isExp&&(
-                    <div style={{padding:'4px 14px 12px'}}>
-                      {items.length===0&&<p style={{fontSize:12,color:'var(--text3)',padding:'8px 0'}}>Valigia vuota — aggiungi articoli</p>}
-                      {items.map(item=>(
-                        <div key={item.id} className="ds-row">
-                          <button className={`ds-status ${dsStatusClass(item.status||'ok')}`}
-                            style={{fontSize:10,padding:'2px 7px'}} onClick={()=>toggleVPStatus(item.id,dsCycleStatus(item.status))}>
-                            {item.status==='ok'?'✅':item.status==='low'?'⚠️':'❌'}
-                          </button>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:500}}>{item.name}</div>
-                            {item.note&&<div style={{fontSize:10,color:'var(--text3)'}}>{item.note}</div>}
+
+        {/* ── LISTA VALIGIE ── */}
+        {valigieTab==='list'&&(
+          <div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+              <div style={{fontSize:12,color:'var(--text2)'}}>{currP?.nome||'—'} · {myV.length} {myV.length===1?'valigia':'valigie'}</div>
+              <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}}
+                onClick={()=>setModal({type:'valigia',data:{id:null,nome:'',icon:'🧳',personaId:activePers,active:true}})}>
+                + Valigia
+              </button>
+            </div>
+            {myV.length===0
+              ? <div className="empty"><div className="empty-icon">🧳</div><p>Nessuna valigia per {currP?.nome||'questa persona'}</p></div>
+              : myV.map(v=>{
+                  const isActive = v.active!==false;
+                  const items = valProd.filter(item=>item.valigie.some(x=>x.id===v.id));
+                  const activePersStatus = s => (s||{})[activePers]||'ok';
+                  const okC  = items.filter(i=>!((i.disabled||{})[activePers])&&activePersStatus(i.status)==='ok').length;
+                  const visC = items.filter(i=>!((i.disabled||{})[activePers])).length;
+                  const isExp= expandV===v.id;
+                  return(
+                    <div key={v.id} className="card-sm" style={{marginBottom:10,padding:0,overflow:'hidden',opacity:isActive?1:0.55}}>
+                      <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',
+                        borderBottom:isExp?'1px solid var(--border)':'none',cursor:'pointer'}}
+                        onClick={()=>setExpandV(isExp?null:v.id)}>
+                        <span style={{fontSize:20}}>{v.icon||'🧳'}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600}}>{v.nome}</div>
+                          <div style={{fontSize:11,color:visC>0&&okC===visC?'var(--green)':'var(--text2)'}}>
+                            {visC===0?'vuota':`${okC}/${visC} OK`}
+                            {!isActive&&<span style={{color:'var(--text3)',marginLeft:6}}>· disattivata</span>}
                           </div>
-                          <button className="btn-icon btn-sm" onClick={()=>setModal({type:'vpItem',data:{...item}})}>✏️</button>
                         </div>
-                      ))}
-                      <button className="btn" style={{width:'100%',marginTop:8,fontSize:12,padding:'7px'}}
-                        onClick={()=>setModal({type:'vpItem',data:{id:null,name:'',note:'',status:'ok',disabled:false,valigiaId:v.id}})}>
-                        + Aggiungi articolo
-                      </button>
+                        {/* Toggle attiva */}
+                        <button title={isActive?'Disattiva':'Attiva'}
+                          onClick={e=>{e.stopPropagation();toggleVActive(v.id);}}
+                          style={{fontSize:14,padding:'4px 6px',borderRadius:6,border:'1px solid var(--border)',
+                            background:isActive?'var(--primary-faint)':'var(--card)',
+                            color:isActive?'var(--primary)':'var(--text3)',cursor:'pointer'}}>
+                          {isActive?'⚡':'○'}
+                        </button>
+                        <button className="btn-icon btn-sm" style={{color:'var(--primary)'}}
+                          onClick={e=>{e.stopPropagation();setModal({type:'valigia',data:{...v}});}}>✏️</button>
+                        <span style={{color:'var(--text3)',fontSize:12}}>{isExp?'▲':'▼'}</span>
+                      </div>
+                      {isExp&&(
+                        <div style={{padding:'6px 14px 12px'}}>
+                          {items.length===0&&<p style={{fontSize:12,color:'var(--text3)',padding:'8px 0'}}>Valigia vuota — aggiungi articoli</p>}
+                          {items.map(item=>{
+                            const pid=activePers;
+                            const st=(item.status||{})[pid]||'ok';
+                            const dis=(item.disabled||{})[pid]||false;
+                            const qtyObj=item.valigie.find(x=>x.id===v.id);
+                            return(
+                              <div key={item.id} className="ds-row" style={{opacity:dis?0.4:1}}>
+                                <button className={`ds-status ${statusClass(st)}`}
+                                  style={{fontSize:10,padding:'2px 7px',minWidth:32}}
+                                  onClick={()=>toggleVPStatusPers(item.id,pid)}>
+                                  {statusIcon(st)}
+                                </button>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{fontSize:12,fontWeight:500}}>{item.name}</div>
+                                  {item.note&&<div style={{fontSize:10,color:'var(--text3)'}}>{item.note}</div>}
+                                  {qtyObj?.qty&&<div style={{fontSize:10,color:'var(--text2)'}}>Qtà: {qtyObj.qty}</div>}
+                                </div>
+                                <button className="btn-icon btn-sm"
+                                  onClick={()=>setModal({type:'vpItem',data:{...item},valigiaCtx:v.id})}>✏️</button>
+                              </div>
+                            );
+                          })}
+                          <button className="btn" style={{width:'100%',marginTop:8,fontSize:12,padding:'7px'}}
+                            onClick={()=>setModal({type:'vpItem',data:{id:null,name:'',note:'',valigie:[{id:v.id,qty:''}],status:{},disabled:{}},valigiaCtx:v.id})}>
+                            + Aggiungi articolo
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })
-        }
+                  );
+                })
+            }
+          </div>
+        )}
+
+        {/* ── DA PREPARARE ── */}
+        {valigieTab==='prepare'&&(
+          <div>
+            <div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>
+              Articoli mancanti o scarsi nelle valigie attive di {currP?.nome||'—'}
+            </div>
+            {daPreparare.length===0
+              ? <div className="empty"><div className="empty-icon">✅</div><p>Tutto pronto!</p></div>
+              : daPreparare.map(item=>{
+                  const st=(item.status||{})[activePers]||'ok';
+                  const bagNames=item.valigie.filter(x=>myActiveVIds.includes(x.id)).map(x=>valigie.find(v=>v.id===x.id)?.nome).filter(Boolean).join(', ');
+                  return(
+                    <div key={item.id} className="card-sm" style={{marginBottom:8,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+                      <button className={`ds-status ${statusClass(st)}`}
+                        style={{fontSize:10,padding:'2px 7px',minWidth:32,flexShrink:0}}
+                        onClick={()=>toggleVPStatusPers(item.id,activePers)}>
+                        {statusIcon(st)}
+                      </button>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:600}}>{item.name}</div>
+                        <div style={{fontSize:10,color:'var(--text3)'}}>{bagNames}</div>
+                        {item.note&&<div style={{fontSize:10,color:'var(--text2)'}}>{item.note}</div>}
+                      </div>
+                      <span style={{fontSize:11,color:'var(--text3)',fontWeight:600}}>{statusLabel(st)}</span>
+                    </div>
+                  );
+                })
+            }
+          </div>
+        )}
       </div>
     );
   };
@@ -2768,7 +2873,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v8.4 · Firebase · GitHub Pages
+        CamperHub v8.5 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -2943,8 +3048,26 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
 
     if(type==='vpItem'){
       const item=data;
+      const pid=activePers;
+      // Tutte le valigie delle persone attive (per scegliere associazioni)
+      const allPersoneV = valigie;
+      const toggleValigia = (vid) => {
+        const cur = item.valigie||[];
+        const exists = cur.find(x=>x.id===vid);
+        setModal(m=>({...m,data:{...m.data,valigie: exists ? cur.filter(x=>x.id!==vid) : [...cur,{id:vid,qty:''}]}}));
+      };
+      const setQty = (vid,q) => {
+        setModal(m=>({...m,data:{...m.data,valigie:(m.data.valigie||[]).map(x=>x.id===vid?{...x,qty:q}:x)}}));
+      };
+      const toggleDis = () => {
+        const cur=item.disabled||{};
+        setModal(m=>({...m,data:{...m.data,disabled:{...cur,[pid]:!cur[pid]}}}));
+      };
+      const curDis=(item.disabled||{})[pid]||false;
+      // Raggruppa valigie per persona
+      const personeAttive = persone.filter(p=>!p.disabled);
       return(
-        <Modal title={item.id?'Modifica Articolo':'Nuovo Articolo'} onClose={()=>setModal(null)} width="400px">
+        <Modal title={item.id?'Modifica Articolo':'Nuovo Articolo'} onClose={()=>setModal(null)} width="420px">
           <div className="form-grid" style={{gap:10}}>
             <div className="field" style={{gridColumn:'1/-1'}}>
               <label className="field-label">Nome *</label>
@@ -2955,19 +3078,51 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
               <input className="field-input" value={item.note||''} onChange={e=>setData('note')(e.target.value)} placeholder="Note opzionali"/>
             </div>
             <div className="field" style={{gridColumn:'1/-1'}}>
-              <label className="field-label">Stato</label>
-              <div style={{display:'flex',gap:8}}>
-                {['ok','low','out'].map(s=>(
-                  <button key={s} className={`ds-status ${dsStatusClass(s)}`}
-                    style={{flex:1,opacity:item.status===s?1:0.3}} onClick={()=>setData('status')(s)}>
-                    {dsStatusLabel(s)}
-                  </button>
-                ))}
-              </div>
+              <label className="field-label">🧳 Valigie associate (e quantità)</label>
+              {personeAttive.map(p=>{
+                const pValigie=allPersoneV.filter(v=>v.personaId===p.id);
+                if(!pValigie.length) return null;
+                return(
+                  <div key={p.id} style={{marginBottom:8}}>
+                    <div style={{fontSize:11,color:p.colore,fontWeight:700,marginBottom:4}}>{p.nome}</div>
+                    {pValigie.map(v=>{
+                      const checked=!!(item.valigie||[]).find(x=>x.id===v.id);
+                      const qtyVal=(item.valigie||[]).find(x=>x.id===v.id)?.qty||'';
+                      return(
+                        <div key={v.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                          <button onClick={()=>toggleValigia(v.id)}
+                            style={{width:20,height:20,borderRadius:4,border:'2px solid '+(checked?'var(--primary)':'var(--border)'),
+                              background:checked?'var(--primary)':'transparent',cursor:'pointer',flexShrink:0,
+                              display:'flex',alignItems:'center',justifyContent:'center',color:'var(--bg)',fontSize:12,fontWeight:700}}>
+                            {checked?'✓':''}
+                          </button>
+                          <span style={{fontSize:12,flex:1}}>{v.icon||'🧳'} {v.nome}</span>
+                          {checked&&(
+                            <input type="text" value={qtyVal} onChange={e=>setQty(v.id,e.target.value)}
+                              placeholder="Qtà" style={{width:60,padding:'3px 7px',borderRadius:6,border:'1px solid var(--border)',
+                                background:'var(--input)',color:'var(--text)',fontSize:12}}/>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
+            {item.id&&(
+              <div className="field" style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:12}}>
+                <label style={{fontSize:13,flex:1}}>Disattiva per {persone.find(p=>p.id===pid)?.nome||'te'}</label>
+                <button className={`btn${!curDis?' btn-primary':''}`} style={{padding:'5px 12px',fontSize:12}}
+                  onClick={toggleDis}>{!curDis?'Attivo':'Disattivato'}</button>
+              </div>
+            )}
           </div>
           <div className="btn-row">
-            <button className="btn-primary" onClick={()=>{if(!item.name.trim()){alert('Inserisci il nome');return;}saveVP(item);}}>✓ Salva</button>
+            <button className="btn-primary" onClick={()=>{
+              if(!item.name.trim()){alert('Inserisci il nome');return;}
+              if(!(item.valigie||[]).length){alert('Associa almeno una valigia');return;}
+              saveVP(item);
+            }}>✓ Salva</button>
             {item.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delVP(item.id)}>🗑️</button>}
             <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
           </div>
