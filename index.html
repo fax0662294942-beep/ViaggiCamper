@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.5</title>
+<title>🚐 CamperHub v8.6</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -481,12 +481,14 @@ const DISP_PERS_DEFAULT = [{id:'p1', nome:'Franco', colore:'#4fd8b4', disabled:f
 const DISP_EMOJIS = ['📦','🚿','🧴','🛏️','🥫','🔧','🏠','🪛','🍕','🎒','👕','📱','🔑','💊','🧹','🥘','🍫','☕','🧃','🌿','🪥','🧽','🛒','🎯','💡','🔌','⛺','📚','🧸','🌊','🎿','🚲','🍷','🧀','🥩','🫙','🧊','🍳'];
 const DISP_BAG_ICONS = ['🧳','🎒','👜','💼','🛍️','🧺','📦','⛺'];
 const DISP_COLORS = ['#4fd8b4','#f0a045','#f06060','#4da6ff','#a855f7','#10b981','#f43f5e','#0ea5e9','#fb923c'];
+const TAG_COLORS  = ['#4fd8b4','#f0a045','#f06060','#4da6ff','#a855f7','#10b981','#f43f5e','#0ea5e9','#fb923c','#eab308','#64748b'];
 const mkDispProds = () => { let id = Date.now(); return DISP_PRODS_TPL.map(p=>({id:id++,name:p.name,cat:p.cat,qty:'',note:'',status:'ok',toBuy:false,disabled:false})); };
 const mkDispensaDoc = (uid, email) => ({
   ownerId:uid, members:[uid], memberEmails:[email],
   categories:DISP_CATS_DEFAULT, products:mkDispProds(),
   spesaManuale:[], persone:DISP_PERS_DEFAULT,
   valigie:[], valigieProdotti:[],
+  tags:[],
 });
 const dsStatusLabel = s => s==='ok'?'✅ OK':s==='low'?'⚠️ Scarso':'❌ Mancante';
 const dsStatusClass = s => s==='ok'?'ds-ok':s==='low'?'ds-low':'ds-out';
@@ -2154,12 +2156,85 @@ function ShareModal({viaggio, user, onClose}){
 }
 
 // ── Viaggi Section ───────────────────────────────────────────────────────
+// ── GruppiManager ────────────────────────────────────────────────────────
+function GruppiManager({gruppi, viaggi, updateTrip, onClose}){
+  const [editId, setEditId]   = React.useState(null);  // nome gruppo in editing
+  const [newName, setNewName] = React.useState('');
+  const [confirm, setConfirm] = React.useState(null);  // gruppo da eliminare
+
+  const renameGruppo = (oldName, name) => {
+    const trimmed = name.trim();
+    if(!trimmed){ alert('Inserisci un nome'); return; }
+    if(trimmed===oldName){ setEditId(null); return; }
+    viaggi.filter(v=>(v.gruppo||'').trim()===oldName).forEach(v=>updateTrip({...v,gruppo:trimmed}));
+    setEditId(null);
+  };
+  const deleteGruppo = (name) => {
+    viaggi.filter(v=>(v.gruppo||'').trim()===name).forEach(v=>updateTrip({...v,gruppo:''}));
+    setConfirm(null);
+  };
+
+  return(
+    <Modal title="📁 Gestisci Gruppi" onClose={onClose} width="420px">
+      {gruppi.length===0&&(
+        <div style={{textAlign:'center',color:'var(--text3)',fontSize:13,padding:'20px 0'}}>
+          Nessun gruppo creato.<br/>Aggiungilo dal form del viaggio.
+        </div>
+      )}
+      {gruppi.map(g=>{
+        const count = viaggi.filter(v=>(v.gruppo||'').trim()===g).length;
+        const isEdit = editId===g;
+        return(
+          <div key={g} style={{marginBottom:10,borderRadius:10,border:'1px solid var(--border)',overflow:'hidden'}}>
+            {isEdit
+              ? <div style={{display:'flex',gap:8,padding:'10px 12px',alignItems:'center'}}>
+                  <input autoFocus className="field-input" style={{flex:1,fontSize:13,padding:'6px 10px'}}
+                    value={newName} onChange={e=>setNewName(e.target.value)}
+                    onKeyDown={e=>{if(e.key==='Enter')renameGruppo(g,newName);if(e.key==='Escape')setEditId(null);}}
+                    placeholder="Nuovo nome"/>
+                  <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>renameGruppo(g,newName)}>✓</button>
+                  <button className="btn" style={{padding:'6px 10px',fontSize:12}} onClick={()=>setEditId(null)}>✕</button>
+                </div>
+              : <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px'}}>
+                  <span style={{fontSize:18}}>📁</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600}}>{g}</div>
+                    <div style={{fontSize:11,color:'var(--text3)'}}>{count} {count===1?'viaggio':'viaggi'}</div>
+                  </div>
+                  <button className="btn-icon btn-sm" title="Rinomina"
+                    onClick={()=>{setEditId(g);setNewName(g);}}>✏️</button>
+                  <button className="btn-icon btn-sm" style={{color:'var(--red)'}} title="Elimina gruppo"
+                    onClick={()=>setConfirm(g)}>🗑️</button>
+                </div>
+            }
+          </div>
+        );
+      })}
+      {confirm&&(
+        <div style={{background:'rgba(240,96,96,.1)',border:'1px solid rgba(240,96,96,.3)',borderRadius:10,padding:'12px 14px',marginTop:10}}>
+          <div style={{fontSize:13,marginBottom:10}}>Eliminare il gruppo <strong>"{confirm}"</strong>?<br/>
+            <span style={{fontSize:11,color:'var(--text3)'}}>I {viaggi.filter(v=>(v.gruppo||'').trim()===confirm).length} viaggi perderanno il gruppo ma non verranno eliminati.</span>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn" style={{flex:1,color:'var(--red)',fontSize:12}} onClick={()=>deleteGruppo(confirm)}>Elimina</button>
+            <button className="btn" style={{flex:1,fontSize:12}} onClick={()=>setConfirm(null)}>Annulla</button>
+          </div>
+        </div>
+      )}
+      <div className="btn-row" style={{marginTop:14}}>
+        <button className="btn" onClick={onClose}>Chiudi</button>
+      </div>
+    </Modal>
+  );
+}
+
 function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip}){
   useBack(onBack);
   const [statusFil, setStatusFil] = React.useState('all');
   const [expandedY,  setExpandedY]  = React.useState({});
   const [expandedG,  setExpandedG]  = React.useState({});
   const [copyData,   setCopyData]   = React.useState(null);
+  const [showGruppi, setShowGruppi] = React.useState(false);
 
   const toggleStatus = (v) => {
     const newStatus = (v.status||'ipotesi')==='ipotesi' ? 'confermato' : 'ipotesi';
@@ -2196,6 +2271,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         <div style={{display:'flex',alignItems:'center',gap:8,width:'100%'}}>
           <button className="btn-icon" onClick={onBack} style={{flexShrink:0}}>←</button>
           <div className="logo" style={{fontSize:15,flex:1}}>✈️ <strong>I miei viaggi</strong></div>
+          <button className="btn" style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁 Gruppi</button>
           <button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16,flexShrink:0}}>🚪</button>
         </div>
@@ -2319,6 +2395,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
       {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`}
         onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
       {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
+      {showGruppi&&<GruppiManager gruppi={gruppiEsistenti} viaggi={viaggi} updateTrip={updateTrip} onClose={()=>setShowGruppi(false)}/>}
     </div>
   );
 }
@@ -2387,6 +2464,8 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const spesa       = dispensa.spesaManuale   || [];
   const persone     = dispensa.persone        || DISP_PERS_DEFAULT;
   const valigie     = dispensa.valigie        || [];
+  const tags        = dispensa.tags           || [];
+  const isAdmin     = dispensa.ownerId === user.uid;
   // Migrazione automatica: vecchio formato {valigiaId, status:string} → nuovo {valigie:[], status:{}, disabled:{}}
   const valProd = (dispensa.valigieProdotti||[]).map(i=> i.valigie ? i : {
     ...i,
@@ -2402,6 +2481,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const [persId,setPersId]     = React.useState(null);
   const [expandV,setExpandV]   = React.useState(null);
   const [valigieTab,setValigieTab] = React.useState('list');
+  const [selectedTag,setSelectedTag] = React.useState(null);
   const [manInp,setManInp]     = React.useState('');
   const [showShare,setShowShare]= React.useState(false);
   // modals: null | {type, data}
@@ -2445,6 +2525,31 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const addManual   = () => { if(!manInp.trim())return; upd({spesaManuale:[...spesa,{id:Date.now(),name:manInp.trim(),done:false}]}); setManInp(''); };
   const toggleManual= id => upd({spesaManuale:spesa.map(s=>s.id===id?{...s,done:!s.done}:s)});
   const removeManual= id => upd({spesaManuale:spesa.filter(s=>s.id!==id)});
+
+  // Tags CRUD
+  const visibleTags = tags.filter(t => t.type==='global' || t.createdBy===user.uid);
+  const saveTag = t => {
+    const updated = t.id && tags.find(x=>x.id===t.id)
+      ? tags.map(x=>x.id===t.id?t:x)
+      : [...tags,{...t,id:'tag_'+Date.now(),createdBy:user.uid}];
+    upd({tags:updated}); setModal(null);
+  };
+  const delTag = id => {
+    upd({
+      tags: tags.filter(t=>t.id!==id),
+      products: prods.map(p=>({...p,tags:(p.tags||[]).filter(tid=>tid!==id)})),
+      valigieProdotti: valProd.map(vp=>({...vp,tags:(vp.tags||[]).filter(tid=>tid!==id)})),
+    });
+    if(selectedTag===id) setSelectedTag(null);
+    setModal(null);
+  };
+  const toggleTagOnItem = (itemArr, setKey, itemId, tagId) => {
+    const newArr = itemArr.map(x=>x.id===itemId
+      ? {...x, tags: (x.tags||[]).includes(tagId) ? (x.tags||[]).filter(t=>t!==tagId) : [...(x.tags||[]),tagId]}
+      : x
+    );
+    upd({[setKey]:newArr});
+  };
 
   // Calcolo diretto senza useMemo per evitare problemi di dipendenze
   const activeProds = prods.filter(p=>!p.disabled);
@@ -2800,6 +2905,177 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
     );
   };
 
+  // ── TAB: TAG ──────────────────────────────────────────────────────────
+  const TabTag = () => {
+    const [showMgmt, setShowMgmt] = React.useState(false);
+
+    // Tag visibili = globali + miei personali
+    const myTags = visibleTags;
+    const selTag = myTags.find(t=>t.id===selectedTag);
+
+    // Prodotti con questo tag
+    const taggedProds = selectedTag
+      ? prods.filter(p=>!p.disabled && (p.tags||[]).includes(selectedTag))
+      : [];
+    // Articoli valigia con questo tag
+    const taggedVP = selectedTag
+      ? valProd.filter(vp=>(vp.tags||[]).includes(selectedTag))
+      : [];
+
+    const canEditTag = t => t.type==='personal' ? t.createdBy===user.uid : isAdmin;
+
+    if(showMgmt){
+      return(
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+            <button className="btn-icon" onClick={()=>setShowMgmt(false)}>←</button>
+            <div style={{fontSize:15,fontWeight:700,flex:1}}>🏷️ Gestisci Tag</div>
+          </div>
+          {/* Globali */}
+          <div className="section-title" style={{marginBottom:8}}>🌐 Tag globali {isAdmin?'(puoi modificare)':'(solo admin)'}</div>
+          <div className="card-sm" style={{padding:'0 12px',marginBottom:14}}>
+            {tags.filter(t=>t.type==='global').length===0&&(
+              <div style={{fontSize:12,color:'var(--text3)',padding:'10px 0'}}>Nessun tag globale</div>
+            )}
+            {tags.filter(t=>t.type==='global').map(t=>(
+              <div key={t.id} className="ds-row">
+                <div style={{width:14,height:14,borderRadius:7,background:t.color,flexShrink:0}}/>
+                <span style={{flex:1,fontSize:13}}>{t.name}</span>
+                <span style={{fontSize:10,color:'var(--text3)'}}>
+                  {prods.filter(p=>(p.tags||[]).includes(t.id)).length + valProd.filter(vp=>(vp.tags||[]).includes(t.id)).length} usi
+                </span>
+                {isAdmin&&<button className="btn-icon btn-sm" onClick={()=>setModal({type:'tag',data:{...t}})}>✏️</button>}
+              </div>
+            ))}
+            {isAdmin&&(
+              <button className="btn" style={{width:'100%',margin:'8px 0 4px',fontSize:12,padding:'7px'}}
+                onClick={()=>setModal({type:'tag',data:{id:null,name:'',color:TAG_COLORS[0],type:'global'}})}>
+                + Tag globale
+              </button>
+            )}
+          </div>
+          {/* Personali */}
+          <div className="section-title" style={{marginBottom:8}}>👤 I miei tag personali</div>
+          <div className="card-sm" style={{padding:'0 12px',marginBottom:14}}>
+            {tags.filter(t=>t.type==='personal'&&t.createdBy===user.uid).length===0&&(
+              <div style={{fontSize:12,color:'var(--text3)',padding:'10px 0'}}>Nessun tag personale</div>
+            )}
+            {tags.filter(t=>t.type==='personal'&&t.createdBy===user.uid).map(t=>(
+              <div key={t.id} className="ds-row">
+                <div style={{width:14,height:14,borderRadius:7,background:t.color,flexShrink:0}}/>
+                <span style={{flex:1,fontSize:13}}>{t.name}</span>
+                <span style={{fontSize:10,color:'var(--text3)'}}>
+                  {prods.filter(p=>(p.tags||[]).includes(t.id)).length + valProd.filter(vp=>(vp.tags||[]).includes(t.id)).length} usi
+                </span>
+                <button className="btn-icon btn-sm" onClick={()=>setModal({type:'tag',data:{...t}})}>✏️</button>
+              </div>
+            ))}
+            <button className="btn" style={{width:'100%',margin:'8px 0 4px',fontSize:12,padding:'7px'}}
+              onClick={()=>setModal({type:'tag',data:{id:null,name:'',color:TAG_COLORS[1],type:'personal'}})}>
+              + Tag personale
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return(
+      <div>
+        {/* Header con bottone gestione */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <div style={{fontSize:13,color:'var(--text2)'}}>Filtra per tag</div>
+          <button className="btn" style={{padding:'5px 10px',fontSize:11}} onClick={()=>setShowMgmt(true)}>
+            ⚙️ Gestisci
+          </button>
+        </div>
+
+        {/* Chips tag */}
+        {myTags.length===0
+          ? <div className="empty"><div className="empty-icon">🏷️</div><p>Nessun tag disponibile.<br/>Tocca "Gestisci" per crearne uno.</p></div>
+          : <>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:16}}>
+              {myTags.map(t=>{
+                const isSel = selectedTag===t.id;
+                const totUsi = prods.filter(p=>(p.tags||[]).includes(t.id)).length + valProd.filter(vp=>(vp.tags||[]).includes(t.id)).length;
+                return(
+                  <button key={t.id} onClick={()=>setSelectedTag(isSel?null:t.id)}
+                    style={{padding:'6px 12px',borderRadius:20,fontSize:12,fontWeight:600,cursor:'pointer',
+                      border:'2px solid '+t.color,
+                      background:isSel?t.color:'transparent',
+                      color:isSel?'var(--bg)':t.color,
+                      display:'flex',alignItems:'center',gap:5}}>
+                    {t.type==='personal'?'👤 ':''}{t.name}
+                    {totUsi>0&&<span style={{fontSize:10,opacity:.8}}>({totUsi})</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Risultati */}
+            {!selectedTag&&<div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:20}}>Seleziona un tag per vedere i prodotti</div>}
+            {selectedTag&&(
+              <div>
+                {taggedProds.length===0&&taggedVP.length===0&&(
+                  <div className="empty"><div className="empty-icon">🔍</div><p>Nessun prodotto con questo tag</p></div>
+                )}
+                {taggedProds.length>0&&(
+                  <>
+                    <div className="section-title" style={{marginBottom:8}}>📦 Dispensa ({taggedProds.length})</div>
+                    <div className="card-sm" style={{padding:'0 12px',marginBottom:14}}>
+                      {taggedProds.map(p=>{
+                        const cat=cats.find(c=>c.id===p.cat);
+                        return(
+                          <div key={p.id} className="ds-row">
+                            <button className={`ds-status ${dsStatusClass(p.status||'ok')}`}
+                              style={{fontSize:10,padding:'2px 7px'}}
+                              onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
+                              {p.status==='ok'?'✅':p.status==='low'?'⚠️':'❌'}
+                            </button>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
+                              {cat&&<div style={{fontSize:10,color:'var(--text3)'}}>{cat.icon} {cat.name}</div>}
+                            </div>
+                            <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+                {taggedVP.length>0&&(
+                  <>
+                    <div className="section-title" style={{marginBottom:8}}>🧳 Valigie ({taggedVP.length})</div>
+                    <div className="card-sm" style={{padding:'0 12px',marginBottom:14}}>
+                      {taggedVP.map(item=>{
+                        const pid=activePers;
+                        const st=(item.status||{})[pid]||'ok';
+                        const bagNames=item.valigie.map(x=>valigie.find(v=>v.id===x.id)?.nome).filter(Boolean).join(', ');
+                        return(
+                          <div key={item.id} className="ds-row">
+                            <button className={`ds-status ${dsStatusClass(st)}`}
+                              style={{fontSize:10,padding:'2px 7px'}}
+                              onClick={()=>toggleVPStatusPers(item.id,pid)}>
+                              {st==='ok'?'✅':st==='low'?'⚠️':'❌'}
+                            </button>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:500}}>{item.name}</div>
+                              {bagNames&&<div style={{fontSize:10,color:'var(--text3)'}}>🧳 {bagNames}</div>}
+                            </div>
+                            <button className="btn-icon btn-sm" onClick={()=>setModal({type:'vpItem',data:{...item},valigiaCtx:null})}>✏️</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        }
+      </div>
+    );
+  };
+
   // ── TAB: IMPOSTAZIONI ─────────────────────────────────────────────────
   const TabImpostazioni = () => (
     <div>
@@ -2838,7 +3114,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
           👥 Condividi dispensa
         </button>
         <button className="btn" style={{textAlign:'left',padding:'12px 16px'}} onClick={()=>{
-          const d=JSON.stringify({categories:cats,products:prods,spesaManuale:spesa,persone,valigie,valigieProdotti:valProd},null,2);
+          const d=JSON.stringify({categories:cats,products:prods,spesaManuale:spesa,persone,valigie,valigieProdotti:valProd,tags},null,2);
           const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([d],{type:'application/json'})); a.download='camperhub-dispensa.json'; a.click();
         }}>📤 Esporta dati JSON</button>
         <button className="btn" style={{textAlign:'left',padding:'12px 16px'}} onClick={()=>{
@@ -2857,6 +3133,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                   persone:    d.persone    || persone,
                   valigie:    d.valigie    || valigie,
                   valigieProdotti: d.valigieProdotti || valProd,
+                  tags:            d.tags            || tags,
                 });
                 alert('Importazione completata!');
               }catch(err){ alert('Errore nel file: '+err.message); }
@@ -2873,7 +3150,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v8.5 · Firebase · GitHub Pages
+        CamperHub v8.6 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -2926,6 +3203,23 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
               <label style={{fontSize:13,flex:1}}>⏸️ Prodotto attivo</label>
               <button className={`btn${!p.disabled?' btn-primary':''}`} style={{padding:'5px 12px',fontSize:12}} onClick={()=>setData('disabled')(!p.disabled)}>{!p.disabled?'Attivo':'Disattivato'}</button>
             </div>}
+            {visibleTags.length>0&&(
+              <div className="field" style={{gridColumn:'1/-1'}}>
+                <label className="field-label">🏷️ Tag</label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {visibleTags.map(t=>{
+                    const on=(p.tags||[]).includes(t.id);
+                    return(
+                      <button key={t.id} onClick={()=>setData('tags')(on?(p.tags||[]).filter(x=>x!==t.id):[...(p.tags||[]),t.id])}
+                        style={{padding:'4px 10px',borderRadius:16,fontSize:11,fontWeight:600,cursor:'pointer',
+                          border:'2px solid '+t.color,background:on?t.color:'transparent',color:on?'var(--bg)':t.color}}>
+                        {t.type==='personal'?'👤 ':''}{t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <div className="btn-row">
             <button className="btn-primary" onClick={()=>{if(!p.name.trim()){alert('Inserisci il nome');return;}saveProd(p);}}>✓ Salva</button>
@@ -3116,6 +3410,23 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                   onClick={toggleDis}>{!curDis?'Attivo':'Disattivato'}</button>
               </div>
             )}
+            {visibleTags.length>0&&(
+              <div className="field" style={{gridColumn:'1/-1'}}>
+                <label className="field-label">🏷️ Tag</label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {visibleTags.map(t=>{
+                    const on=(item.tags||[]).includes(t.id);
+                    return(
+                      <button key={t.id} onClick={()=>setData('tags')(on?(item.tags||[]).filter(x=>x!==t.id):[...(item.tags||[]),t.id])}
+                        style={{padding:'4px 10px',borderRadius:16,fontSize:11,fontWeight:600,cursor:'pointer',
+                          border:'2px solid '+t.color,background:on?t.color:'transparent',color:on?'var(--bg)':t.color}}>
+                        {t.type==='personal'?'👤 ':''}{t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <div className="btn-row">
             <button className="btn-primary" onClick={()=>{
@@ -3129,10 +3440,56 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </Modal>
       );
     }
+    if(type==='tag'){
+      const t=data;
+      const canChange = t.type==='global' ? isAdmin : true;
+      return(
+        <Modal title={t.id?'Modifica Tag':'Nuovo Tag'} onClose={()=>setModal(null)} width="400px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={t.name} onChange={e=>setData('name')(e.target.value)} placeholder="es. Urgente, Mare, Farmaci"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Colore</label>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {TAG_COLORS.map(col=>(
+                  <div key={col} onClick={()=>setData('color')(col)}
+                    style={{width:28,height:28,borderRadius:14,background:col,cursor:'pointer',
+                      border:'3px solid '+(t.color===col?'#fff':'transparent'),
+                      boxShadow:t.color===col?'0 0 0 2px '+col:'none'}}/>
+                ))}
+              </div>
+            </div>
+            {!t.id&&isAdmin&&(
+              <div className="field" style={{gridColumn:'1/-1'}}>
+                <label className="field-label">Tipo</label>
+                <div style={{display:'flex',gap:8}}>
+                  {[['global','🌐 Globale (tutti)'],['personal','👤 Personale (solo io)']].map(([v,lbl])=>(
+                    <button key={v} onClick={()=>setData('type')(v)}
+                      style={{flex:1,padding:'7px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',
+                        border:'2px solid '+(t.type===v?'var(--primary)':'var(--border)'),
+                        background:t.type===v?'var(--primary-faint)':'var(--card)',
+                        color:t.type===v?'var(--primary)':'var(--text2)'}}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{if(!t.name.trim()){alert('Inserisci il nome');return;}saveTag(t);}}>✓ Salva</button>
+            {t.id&&canChange&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delTag(t.id)}>🗑️</button>}
+            <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      );
+    }
     return null;
   };
 
-  const TABS=[['inventario','📦','Inventario'],['spesa','🛒','Spesa'],['portare','🏠','Portare'],['valigie','🧳','Valigie'],['impostazioni','⚙️','Impost.']];
+  const TABS=[['inventario','📦','Inventario'],['spesa','🛒','Spesa'],['tag','🏷️','Tag'],['portare','🏠','Portare'],['valigie','🧳','Valigie'],['impostazioni','⚙️','Impost.']];
   return(
     <div>
       {/* Header */}
@@ -3161,6 +3518,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
       <div className="container">
         {tab==='inventario' && <TabInventario/>}
         {tab==='spesa'      && <TabSpesa/>}
+        {tab==='tag'        && <TabTag/>}
         {tab==='portare'    && <TabPortare/>}
         {tab==='valigie'    && <TabValigie/>}
         {tab==='impostazioni' && <TabImpostazioni/>}
