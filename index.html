@@ -2570,6 +2570,23 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
 
 
   // ── TAB: INVENTARIO ───────────────────────────────────────────────────
+  // Mini badge tag per le righe prodotto
+  const TagBadges = ({itemTags}) => {
+    if(!itemTags||!itemTags.length) return null;
+    const myVisible = visibleTags.filter(t=>itemTags.includes(t.id));
+    if(!myVisible.length) return null;
+    return(
+      <div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:3}}>
+        {myVisible.map(t=>(
+          <span key={t.id} style={{fontSize:9,fontWeight:700,padding:'1px 6px',borderRadius:10,
+            background:t.color+'22',color:t.color,border:'1px solid '+t.color+'55',letterSpacing:.2}}>
+            {t.name}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   const TabInventario = () => {
     return (
       <div>
@@ -2628,6 +2645,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                       <div style={{fontSize:13,fontWeight:500,textDecoration:p.disabled?'line-through':'none'}}>{p.name}</div>
                       {(p.qty||p.note)&&!p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
                       {p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>disattivato</div>}
+                      <TagBadges itemTags={p.tags}/>
                     </div>
                     {!p.disabled && <>
                       <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
@@ -2672,7 +2690,11 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
               {autoBuy.map(p=>{const cat=cats.find(c=>c.id===p.cat);return(
                 <div key={p.id} className="ds-row">
                   <span style={{fontSize:15}}>{cat?.icon||'📦'}</span>
-                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500}}>{p.name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{cat?.name}</div></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
+                    <div style={{fontSize:10,color:'var(--text3)'}}>{cat?.name}</div>
+                    <TagBadges itemTags={p.tags}/>
+                  </div>
                   <span className={`ds-status ${dsStatusClass(p.status||'ok')}`}>{dsStatusLabel(p.status||'ok')}</span>
                   <button className="btn-icon btn-sm" style={{color:'var(--red)'}} title="Togli dalla lista" onClick={()=>toggleBuy(p.id)}>✕</button>
                 </div>
@@ -2852,6 +2874,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                                   <div style={{fontSize:12,fontWeight:500}}>{item.name}</div>
                                   {item.note&&<div style={{fontSize:10,color:'var(--text3)'}}>{item.note}</div>}
                                   {qtyObj?.qty&&<div style={{fontSize:10,color:'var(--text2)'}}>Qtà: {qtyObj.qty}</div>}
+                                  <TagBadges itemTags={item.tags}/>
                                 </div>
                                 <button className="btn-icon btn-sm"
                                   onClick={()=>setModal({type:'vpItem',data:{...item},valigiaCtx:v.id})}>✏️</button>
