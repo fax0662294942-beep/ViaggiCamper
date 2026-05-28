@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.6</title>
+<title>🚐 CamperHub v8.7</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2457,6 +2457,23 @@ function DispensaShareModal({dispensa, dispensaId, user, onClose}){
 }
 
 // ── Dispensa View ─────────────────────────────────────────────────────────
+// ── TagBadges — badge tag inline nelle righe prodotto ────────────────────
+function TagBadges({itemTags, visibleTags}){
+  if(!itemTags||!itemTags.length) return null;
+  const myVisible = (visibleTags||[]).filter(t=>itemTags.includes(t.id));
+  if(!myVisible.length) return null;
+  return(
+    <div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:3}}>
+      {myVisible.map(t=>(
+        <span key={t.id} style={{fontSize:9,fontWeight:700,padding:'1px 6px',borderRadius:10,
+          background:t.color+'22',color:t.color,border:'1px solid '+t.color+'55',letterSpacing:.2}}>
+          {t.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   useBack(onBack);
   const cats        = dispensa.categories     || DISP_CATS_DEFAULT;
@@ -2571,21 +2588,6 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
 
   // ── TAB: INVENTARIO ───────────────────────────────────────────────────
   // Mini badge tag per le righe prodotto
-  const TagBadges = ({itemTags}) => {
-    if(!itemTags||!itemTags.length) return null;
-    const myVisible = visibleTags.filter(t=>itemTags.includes(t.id));
-    if(!myVisible.length) return null;
-    return(
-      <div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:3}}>
-        {myVisible.map(t=>(
-          <span key={t.id} style={{fontSize:9,fontWeight:700,padding:'1px 6px',borderRadius:10,
-            background:t.color+'22',color:t.color,border:'1px solid '+t.color+'55',letterSpacing:.2}}>
-            {t.name}
-          </span>
-        ))}
-      </div>
-    );
-  };
 
   const TabInventario = () => {
     return (
@@ -2645,7 +2647,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                       <div style={{fontSize:13,fontWeight:500,textDecoration:p.disabled?'line-through':'none'}}>{p.name}</div>
                       {(p.qty||p.note)&&!p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
                       {p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>disattivato</div>}
-                      <TagBadges itemTags={p.tags}/>
+                      <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
                     </div>
                     {!p.disabled && <>
                       <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
@@ -2693,7 +2695,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
                     <div style={{fontSize:10,color:'var(--text3)'}}>{cat?.name}</div>
-                    <TagBadges itemTags={p.tags}/>
+                    <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
                   </div>
                   <span className={`ds-status ${dsStatusClass(p.status||'ok')}`}>{dsStatusLabel(p.status||'ok')}</span>
                   <button className="btn-icon btn-sm" style={{color:'var(--red)'}} title="Togli dalla lista" onClick={()=>toggleBuy(p.id)}>✕</button>
@@ -2874,7 +2876,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                                   <div style={{fontSize:12,fontWeight:500}}>{item.name}</div>
                                   {item.note&&<div style={{fontSize:10,color:'var(--text3)'}}>{item.note}</div>}
                                   {qtyObj?.qty&&<div style={{fontSize:10,color:'var(--text2)'}}>Qtà: {qtyObj.qty}</div>}
-                                  <TagBadges itemTags={item.tags}/>
+                                  <TagBadges itemTags={item.tags} visibleTags={visibleTags}/>
                                 </div>
                                 <button className="btn-icon btn-sm"
                                   onClick={()=>setModal({type:'vpItem',data:{...item},valigiaCtx:v.id})}>✏️</button>
@@ -3173,7 +3175,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v8.6 · Firebase · GitHub Pages
+        CamperHub v8.7 · Firebase · GitHub Pages
       </div>
     </div>
   );
