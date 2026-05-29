@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.7</title>
+<title>🚐 CamperHub v8.8</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -488,7 +488,7 @@ const mkDispensaDoc = (uid, email) => ({
   categories:DISP_CATS_DEFAULT, products:mkDispProds(),
   spesaManuale:[], persone:DISP_PERS_DEFAULT,
   valigie:[], valigieProdotti:[],
-  tags:[],
+  tags:[], luoghi:[],
 });
 const dsStatusLabel = s => s==='ok'?'✅ OK':s==='low'?'⚠️ Scarso':'❌ Mancante';
 const dsStatusClass = s => s==='ok'?'ds-ok':s==='low'?'ds-low':'ds-out';
@@ -2482,6 +2482,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   const persone     = dispensa.persone        || DISP_PERS_DEFAULT;
   const valigie     = dispensa.valigie        || [];
   const tags        = dispensa.tags           || [];
+  const luoghi      = dispensa.luoghi         || [];
   const isAdmin     = dispensa.ownerId === user.uid;
   // Migrazione automatica: vecchio formato {valigiaId, status:string} → nuovo {valigie:[], status:{}, disabled:{}}
   const valProd = (dispensa.valigieProdotti||[]).map(i=> i.valigie ? i : {
@@ -2492,6 +2493,8 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   });
 
   const [tab,setTab]           = React.useState('inventario');
+  const [invVista,setInvVista] = React.useState('categorie'); // 'categorie' | 'luoghi'
+  const [luogoOpenMap,setLuogoOpenMap] = React.useState({});
   const [selCat,setSelCat]     = React.useState('all');
   const [invFil,setInvFil]     = React.useState('all');
   const [portareOk,setPortareOk] = React.useState({});
@@ -2568,6 +2571,27 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
     upd({[setKey]:newArr});
   };
 
+  // Luoghi CRUD
+  const saveLuogo = l => {
+    const updated = l.id && luoghi.find(x=>x.id===l.id)
+      ? luoghi.map(x=>x.id===l.id?l:x)
+      : [...luoghi,{...l,id:'loc_'+Date.now()}];
+    upd({luoghi:updated}); setModal(null);
+  };
+  const deleteLuogo = id => {
+    upd({
+      luoghi: luoghi.filter(l=>l.id!==id),
+      products: prods.map(p=>p.luogoId===id?{...p,luogoId:null}:p),
+    });
+    setModal(null);
+  };
+  const getLuogoStats = lid => {
+    const items = lid===null
+      ? prods.filter(p=>!p.disabled&&!p.luogoId)
+      : prods.filter(p=>!p.disabled&&p.luogoId===lid);
+    return {tot:items.length, bad:items.filter(p=>p.status==='low'||p.status==='out').length};
+  };
+
   // Calcolo diretto senza useMemo per evitare problemi di dipendenze
   const activeProds = prods.filter(p=>!p.disabled);
   // Prodotti da mostrare: attivi filtrati + disattivati in fondo (sempre visibili ma oscurati)
@@ -2590,88 +2614,166 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   // Mini badge tag per le righe prodotto
 
   const TabInventario = () => {
+    // Vista Luoghi: accordion per luogo
+    const renderVistaLuoghi = () => {
+      const prodsAttivi = prods.filter(p=>!p.disabled);
+      // Luoghi censiti + slot "Senza luogo"
+      const slots = [
+        ...luoghi.map(l=>({id:l.id, nome:l.nome, icona:l.icona||'📍', items:prodsAttivi.filter(p=>p.luogoId===l.id)})),
+        {id:null, nome:'Senza luogo', icona:'❓', items:prodsAttivi.filter(p=>!p.luogoId)},
+      ].filter(s=>s.id!==null||s.items.length>0);
+
+      return(
+        <div>
+          {slots.length===0&&<div className="empty"><div className="empty-icon">📍</div><p>Nessun luogo configurato.<br/>Aggiungili dalle impostazioni.</p></div>}
+          {slots.map(slot=>{
+            const isOpen = luogoOpenMap[slot.id||'null']!==false; // default aperto
+            const bad = slot.items.filter(p=>p.status==='low'||p.status==='out').length;
+            return(
+              <div key={slot.id||'null'} className="card-sm" style={{marginBottom:10,padding:0,overflow:'hidden'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',
+                  borderBottom:isOpen&&slot.items.length?'1px solid var(--border)':'none',cursor:'pointer'}}
+                  onClick={()=>setLuogoOpenMap(m=>({...m,[slot.id||'null']:!isOpen}))}>
+                  <span style={{fontSize:20}}>{slot.icona}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600}}>{slot.nome}</div>
+                    <div style={{fontSize:11,color:bad>0?'var(--red)':'var(--text3)'}}>
+                      {slot.items.length} prodotti{bad>0?` · ${bad} da controllare`:''}
+                    </div>
+                  </div>
+                  {slot.id&&<button className="btn-icon btn-sm" style={{color:'var(--text3)'}}
+                    onClick={e=>{e.stopPropagation();setModal({type:'luogo',data:{...luoghi.find(l=>l.id===slot.id)}});}}>✏️</button>}
+                  <span style={{color:'var(--text3)',fontSize:12}}>{isOpen?'▲':'▼'}</span>
+                </div>
+                {isOpen&&(
+                  <div style={{padding:'0 12px 8px'}}>
+                    {slot.items.length===0
+                      ? <p style={{fontSize:12,color:'var(--text3)',padding:'8px 0'}}>Nessun prodotto in questo luogo</p>
+                      : slot.items.map(p=>{
+                          const cat=cats.find(c=>c.id===p.cat);
+                          return(
+                            <div key={p.id} className="ds-row">
+                              <span style={{fontSize:15,flexShrink:0}}>{cat?.icon||'📦'}</span>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
+                                {(p.qty||p.note)&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
+                                <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
+                              </div>
+                              <button className={`ds-status ${dsStatusClass(p.status||'ok')}`}
+                                style={{fontSize:10,padding:'2px 7px'}}
+                                onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
+                                {dsStatusLabel(p.status||'ok')}
+                              </button>
+                              <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
+                            </div>
+                          );
+                        })
+                    }
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <button className="ds-fab" onClick={()=>setModal({type:'prod',data:{id:null,name:'',cat:cats[0]?.id||'varie',qty:'',note:'',status:'ok',toBuy:false,disabled:false,luogoId:null}})}>+</button>
+        </div>
+      );
+    };
+
     return (
       <div>
         {/* Statistiche rapide */}
         <div className="card-sm" style={{display:'flex',justifyContent:'space-around',padding:'16px 8px',marginBottom:14,gap:4}}>
           {[[activeProds.length,'var(--text)','TOTALE','all','all'],[statsLow,'var(--accent)','⚠️ SCARSO','all','low'],[statsOut,'var(--red)','❌ MANCANTE','all','out'],[statsBuy,'var(--primary)','🛒 DA COMP.','all','buy']].map(([num,col,lbl,cat,fil])=>(
-            <div key={lbl} onClick={()=>{setSelCat(cat);setInvFil(fil);}}
+            <div key={lbl} onClick={()=>{setSelCat(cat);setInvFil(fil);setInvVista('categorie');}}
               style={{textAlign:'center',cursor:'pointer',flex:1,padding:'8px 4px',borderRadius:10,
-                background:(selCat===cat&&invFil===fil)?`rgba(${hexRgb(col==='var(--text)'?'#d8eee4':col.replace('var(--accent)','#f0a045').replace('var(--red)','#f06060').replace('var(--primary)','#4fd8b4'))},.1)`:'transparent'}}>
+                background:(invVista==='categorie'&&selCat===cat&&invFil===fil)?`rgba(${hexRgb(col==='var(--text)'?'#d8eee4':col.replace('var(--accent)','#f0a045').replace('var(--red)','#f06060').replace('var(--primary)','#4fd8b4'))},.1)`:'transparent'}}>
               <div style={{fontSize:26,fontWeight:800,fontFamily:"'Syne',sans-serif",color:col,lineHeight:1}}>{num}</div>
               <div style={{fontSize:10,color:'var(--text3)',fontWeight:600,marginTop:4}}>{lbl}</div>
             </div>
           ))}
         </div>
 
-        {/* Griglia categorie */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:12}}>
-          {[{id:'all',name:'Tutti',icon:'📋',color:'#4fd8b4'},...cats].map(c=>{
-            const tot = c.id==='all' ? prods.filter(p=>!p.disabled).length : prods.filter(p=>p.cat===c.id&&!p.disabled).length;
-            const bad = c.id==='all' ? 0 : prods.filter(p=>p.cat===c.id&&!p.disabled&&(p.status==='low'||p.status==='out')).length;
-            const isSel = selCat===c.id;
-            return (
-              <div key={c.id} onClick={()=>{setSelCat(c.id);setInvFil('all');}}
-                style={{background:isSel?`rgba(${hexRgb(c.color)},.18)`:'var(--card)',border:'1.5px solid '+(isSel?c.color:'var(--border)'),borderRadius:12,padding:'10px 4px',textAlign:'center',cursor:'pointer',position:'relative',transition:'all .15s'}}>
-                <div style={{fontSize:18,marginBottom:3}}>{c.icon}</div>
-                <div style={{fontSize:9,color:'var(--text2)',fontWeight:600,lineHeight:1.2}}>{c.name}</div>
-                <div style={{fontSize:11,fontWeight:700,color:bad>0?'var(--red)':'var(--text2)'}}>{tot}</div>
-                {bad>0&&<div style={{position:'absolute',top:3,right:3,background:'var(--red)',color:'#fff',fontSize:9,fontWeight:800,minWidth:15,height:15,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center'}}>{bad}</div>}
-              </div>
-            );
-          })}
+        {/* Pill vista */}
+        <div style={{display:'flex',gap:0,borderRadius:10,overflow:'hidden',border:'1px solid var(--border)',marginBottom:14}}>
+          {[['categorie','📦 Categorie'],['luoghi','📍 Luoghi']].map(([k,lbl])=>(
+            <button key={k} onClick={()=>setInvVista(k)}
+              style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',
+                background:invVista===k?'var(--primary)':'var(--card)',
+                color:invVista===k?'var(--bg)':'var(--text2)',transition:'background .15s'}}>
+              {lbl}
+            </button>
+          ))}
         </div>
 
-        {/* Filtri stato */}
-        {selCat!=='all'&&(
-          <div style={{display:'flex',gap:5,marginBottom:10,overflowX:'auto'}}>
-            {[['all','Tutti'],['low','⚠️ Scarso'],['out','❌ Mancante'],['buy','🛒 Da comprare']].map(([f,l])=>(
-              <button key={f} className={`btn-tab${invFil===f?' active':''}`} onClick={()=>setInvFil(f)} style={{flexShrink:0,padding:'4px 9px',fontSize:11}}>{l}</button>
-            ))}
+        {/* Vista Luoghi */}
+        {invVista==='luoghi' && renderVistaLuoghi()}
+
+        {/* Vista Categorie (invariata) */}
+        {invVista==='categorie' && (<>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:12}}>
+            {[{id:'all',name:'Tutti',icon:'📋',color:'#4fd8b4'},...cats].map(c=>{
+              const tot = c.id==='all' ? prods.filter(p=>!p.disabled).length : prods.filter(p=>p.cat===c.id&&!p.disabled).length;
+              const bad = c.id==='all' ? 0 : prods.filter(p=>p.cat===c.id&&!p.disabled&&(p.status==='low'||p.status==='out')).length;
+              const isSel = selCat===c.id;
+              return (
+                <div key={c.id} onClick={()=>{setSelCat(c.id);setInvFil('all');}}
+                  style={{background:isSel?`rgba(${hexRgb(c.color)},.18)`:'var(--card)',border:'1.5px solid '+(isSel?c.color:'var(--border)'),borderRadius:12,padding:'10px 4px',textAlign:'center',cursor:'pointer',position:'relative',transition:'all .15s'}}>
+                  <div style={{fontSize:18,marginBottom:3}}>{c.icon}</div>
+                  <div style={{fontSize:9,color:'var(--text2)',fontWeight:600,lineHeight:1.2}}>{c.name}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:bad>0?'var(--red)':'var(--text2)'}}>{tot}</div>
+                  {bad>0&&<div style={{position:'absolute',top:3,right:3,background:'var(--red)',color:'#fff',fontSize:9,fontWeight:800,minWidth:15,height:15,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center'}}>{bad}</div>}
+                </div>
+              );
+            })}
           </div>
-        )}
-
-        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
-          <button className="btn" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setModal({type:'catManage'})}>⚙️ Categorie</button>
-        </div>
-
-        {filteredProds.length===0
-          ? <div className="empty"><div className="empty-icon">📦</div><p>Nessun prodotto trovato</p></div>
-          : <div className="card-sm" style={{padding:'0 12px'}}>
-              {filteredProds.map(p=>{
-                const cat=cats.find(c=>c.id===p.cat);
-                return (
-                  <div key={p.id} className="ds-row" style={{opacity:p.disabled?0.4:1}}>
-                    <span style={{fontSize:16,flexShrink:0}}>{cat?.icon||'📦'}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:500,textDecoration:p.disabled?'line-through':'none'}}>{p.name}</div>
-                      {(p.qty||p.note)&&!p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
-                      {p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>disattivato</div>}
-                      <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
-                    </div>
-                    {!p.disabled && <>
-                      <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
-                        {dsStatusLabel(p.status||'ok')}
-                      </button>
-                      <button onClick={()=>toggleBuy(p.id)}
-                        style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:12,border:'1.5px solid',cursor:'pointer',whiteSpace:'nowrap',
-                          background:p.toBuy?'rgba(79,216,180,.15)':'transparent',
-                          color:p.toBuy?'var(--primary)':'var(--text3)',
-                          borderColor:p.toBuy?'var(--primary)':'transparent'}}>
-                        🛒{p.toBuy?' Spesa':''}
-                      </button>
-                    </>}
-                    {p.disabled && (
-                      <button className="btn btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--primary)'}}
-                        onClick={()=>setModal({type:'prod',data:{...p}})}>riattiva</button>
-                    )}
-                    <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
-                  </div>
-                );
-              })}
+          {selCat!=='all'&&(
+            <div style={{display:'flex',gap:5,marginBottom:10,overflowX:'auto'}}>
+              {[['all','Tutti'],['low','⚠️ Scarso'],['out','❌ Mancante'],['buy','🛒 Da comprare']].map(([f,l])=>(
+                <button key={f} className={`btn-tab${invFil===f?' active':''}`} onClick={()=>setInvFil(f)} style={{flexShrink:0,padding:'4px 9px',fontSize:11}}>{l}</button>
+              ))}
             </div>
-        }
-        <button className="ds-fab" onClick={()=>setModal({type:'prod',data:{id:null,name:'',cat:cats[0]?.id||'varie',qty:'',note:'',status:'ok',toBuy:false,disabled:false}})}>+</button>
+          )}
+          <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+            <button className="btn" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setModal({type:'catManage'})}>⚙️ Categorie</button>
+          </div>
+          {filteredProds.length===0
+            ? <div className="empty"><div className="empty-icon">📦</div><p>Nessun prodotto trovato</p></div>
+            : <div className="card-sm" style={{padding:'0 12px'}}>
+                {filteredProds.map(p=>{
+                  const cat=cats.find(c=>c.id===p.cat);
+                  return (
+                    <div key={p.id} className="ds-row" style={{opacity:p.disabled?0.4:1}}>
+                      <span style={{fontSize:16,flexShrink:0}}>{cat?.icon||'📦'}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:500,textDecoration:p.disabled?'line-through':'none'}}>{p.name}</div>
+                        {(p.qty||p.note)&&!p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
+                        {p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>disattivato</div>}
+                        <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
+                      </div>
+                      {!p.disabled && <>
+                        <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
+                          {dsStatusLabel(p.status||'ok')}
+                        </button>
+                        <button onClick={()=>toggleBuy(p.id)}
+                          style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:12,border:'1.5px solid',cursor:'pointer',whiteSpace:'nowrap',
+                            background:p.toBuy?'rgba(79,216,180,.15)':'transparent',
+                            color:p.toBuy?'var(--primary)':'var(--text3)',
+                            borderColor:p.toBuy?'var(--primary)':'transparent'}}>
+                          🛒{p.toBuy?' Spesa':''}
+                        </button>
+                      </>}
+                      {p.disabled && (
+                        <button className="btn btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--primary)'}}
+                          onClick={()=>setModal({type:'prod',data:{...p}})}>riattiva</button>
+                      )}
+                      <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
+                    </div>
+                  );
+                })}
+              </div>
+          }
+          <button className="ds-fab" onClick={()=>setModal({type:'prod',data:{id:null,name:'',cat:cats[0]?.id||'varie',qty:'',note:'',status:'ok',toBuy:false,disabled:false,luogoId:null}})}>+</button>
+        </>)}
       </div>
     );
   };
@@ -3118,6 +3220,22 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
           + Aggiungi persona
         </button>
       </div>
+      <div className="section-title" style={{marginBottom:10}}>📍 Luoghi</div>
+      <div className="card-sm" style={{padding:'0 12px',marginBottom:12}}>
+        {luoghi.length===0&&<div style={{fontSize:12,color:'var(--text3)',padding:'10px 0'}}>Nessun luogo — aggiungine uno</div>}
+        {luoghi.map(l=>(
+          <div key={l.id} className="ds-row">
+            <span style={{fontSize:18}}>{l.icona||'📍'}</span>
+            <span style={{flex:1,fontSize:13}}>{l.nome}</span>
+            <span style={{fontSize:11,color:'var(--text3)'}}>{prods.filter(p=>p.luogoId===l.id&&!p.disabled).length} prod.</span>
+            <button className="btn-icon btn-sm" onClick={()=>setModal({type:'luogo',data:{...l}})}>✏️</button>
+          </div>
+        ))}
+        <button className="btn" style={{width:'100%',margin:'8px 0 4px',fontSize:12,padding:'7px'}}
+          onClick={()=>setModal({type:'luogo',data:{id:null,nome:'',icona:'📍'}})}>
+          + Nuovo luogo
+        </button>
+      </div>
       <div className="section-title" style={{marginBottom:10}}>🗂️ Categorie</div>
       <div className="card-sm" style={{padding:'0 12px',marginBottom:12}}>
         {cats.map(c=>(
@@ -3139,7 +3257,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
           👥 Condividi dispensa
         </button>
         <button className="btn" style={{textAlign:'left',padding:'12px 16px'}} onClick={()=>{
-          const d=JSON.stringify({categories:cats,products:prods,spesaManuale:spesa,persone,valigie,valigieProdotti:valProd,tags},null,2);
+          const d=JSON.stringify({categories:cats,products:prods,spesaManuale:spesa,persone,valigie,valigieProdotti:valProd,tags,luoghi},null,2);
           const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([d],{type:'application/json'})); a.download='camperhub-dispensa.json'; a.click();
         }}>📤 Esporta dati JSON</button>
         <button className="btn" style={{textAlign:'left',padding:'12px 16px'}} onClick={()=>{
@@ -3159,6 +3277,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                   valigie:    d.valigie    || valigie,
                   valigieProdotti: d.valigieProdotti || valProd,
                   tags:            d.tags            || tags,
+                  luoghi:          d.luoghi          || luoghi,
                 });
                 alert('Importazione completata!');
               }catch(err){ alert('Errore nel file: '+err.message); }
@@ -3175,7 +3294,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v8.7 · Firebase · GitHub Pages
+        CamperHub v8.8 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -3199,6 +3318,13 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
               <label className="field-label">Categoria</label>
               <select className="field-input" value={p.cat} onChange={e=>setData('cat')(e.target.value)}>
                 {cats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label className="field-label">Luogo</label>
+              <select className="field-input" value={p.luogoId||''} onChange={e=>setData('luogoId')(e.target.value||null)}>
+                <option value="">— Nessun luogo —</option>
+                {luoghi.map(l=><option key={l.id} value={l.id}>{l.icona||'📍'} {l.nome}</option>)}
               </select>
             </div>
             <div className="field">
@@ -3460,6 +3586,37 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
               saveVP(item);
             }}>✓ Salva</button>
             {item.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>delVP(item.id)}>🗑️</button>}
+            <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      );
+    }
+    if(type==='luogo'){
+      const l=data;
+      return(
+        <Modal title={l.id?'Modifica Luogo':'Nuovo Luogo'} onClose={()=>setModal(null)} width="380px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={l.nome} onChange={e=>setData('nome')(e.target.value)} placeholder="es. Pensile cucina, Frigo, Bagagliaio…"/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Icona (emoji)</label>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {['🏠','🧊','🍽️','🔧','📦','🛁','🚐','⛺','🪣','🗄️','🧺','💊','🔌','🪴'].map(em=>(
+                  <div key={em} onClick={()=>setData('icona')(em)}
+                    style={{width:36,height:36,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:20,cursor:'pointer',border:'2px solid '+(l.icona===em?'var(--primary)':'var(--border)'),
+                      background:l.icona===em?'var(--primary-faint)':'var(--card)'}}>
+                    {em}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{if(!l.nome.trim()){alert('Inserisci il nome');return;}saveLuogo(l);}}>✓ Salva</button>
+            {l.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>{if(!confirm('Eliminare luogo? I prodotti resteranno ma perderanno il luogo.'))return;deleteLuogo(l.id);}}>🗑️</button>}
             <button className="btn" onClick={()=>setModal(null)}>Annulla</button>
           </div>
         </Modal>
