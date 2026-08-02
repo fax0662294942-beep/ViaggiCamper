@@ -2417,6 +2417,18 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     if(!dailyChanged){
       const copy = {...viaggio,[tab]:[...viaggio[tab]],
         tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
+      const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
+
+      // Auto-repair km/gasolio: ripristina i valori sul fuelIdx se sono stati azzerati/corrotti.
+      // Sicuro solo quando fuelIdx === sIdx (prima tappa: il giorno carburante è lo stesso check-in).
+      if(fuelIdx === sIdx){
+        const fuelDay = copy[tab][fuelIdx];
+        const wantKm  = n(oldTappa.kmTappa||0);
+        const wantGas = n(oldTappa.costoCarburante||0);
+        if(wantKm  > 0 && n(fuelDay.km)      !== wantKm)  copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: wantKm};
+        if(wantGas > 0 && n(copy[tab][fuelIdx].gasolio) !== wantGas) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: wantGas};
+      }
+
       // Migrazione traghetto: se è sul giorno sbagliato (sIdx-1 = old code), spostalo su sIdx
       const oldTrag = n(oldTappa.costoTraghetto||0);
       if(oldTrag > 0 && sIdx > 0){
