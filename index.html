@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.6</title>
+<title>🚐 CamperHub v9.7</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3041,7 +3041,9 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
                           <div style={{display:'flex',gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
                             <button className="btn-icon btn-sm" title="Copia" onClick={()=>setCopyData(v)} style={{fontSize:13,padding:'4px 5px'}}>📋</button>
                             <button className="btn-icon btn-sm" style={{color:'var(--primary)',padding:'4px 5px'}} onClick={()=>setShare(v)} title="Condividi">👥</button>
-                            {v.ownerId===user.uid&&<button className="btn-icon btn-sm" style={{color:'var(--red)',padding:'4px 5px'}} onClick={()=>setDel(v.id)}>🗑</button>}
+                            {v.ownerId===user.uid
+                              ? <button className="btn-icon btn-sm" style={{color:'var(--red)',padding:'4px 5px'}} onClick={()=>setDel(v.id)}>🗑</button>
+                              : <span title="Viaggio condiviso — solo il proprietario può eliminarlo" style={{fontSize:13,opacity:.4,padding:'4px 5px',cursor:'default'}}>🔒</span>}
                           </div>
                         </div>
                       </div>
@@ -4195,7 +4197,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.6 · Firebase · GitHub Pages
+        CamperHub v9.7 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4738,7 +4740,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.6</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.7</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
