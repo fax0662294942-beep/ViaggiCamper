@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.3</title>
+<title>🚐 CamperHub v9.4</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1433,8 +1433,27 @@ function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit}
     const prevRiporto = riporto;
     const disponibile = allocato + prevRiporto;
     const tappaGiorni = data.filter(d => d.idTappa === t.idTappa);
-    const spesoTappa  = tappaGiorni.reduce((a, d) => a + calcCassa(data, data.indexOf(d)), 0);
-    const residuo     = disponibile - spesoTappa;
+
+    // Calcola speso con attribuzione corretta dei checkout condivisi:
+    // - ESCLUDI pagamentoCheckoutPrev dal giorno condiviso (appartiene alla tappa precedente)
+    // - INCLUDI il checkout di questa tappa che appare sul giorno condiviso della tappa successiva
+    const firstDay = tappaGiorni[0];
+    const spesoBase = tappaGiorni.reduce((a, d) => {
+      const idx = data.indexOf(d);
+      let cassa = calcCassa(data, idx);
+      // Il giorno condiviso (primo giorno di questa tappa) porta pagamentoCheckoutPrev
+      // della tappa uscente: va sottratto perché non è spesa di questa tappa
+      if(d === firstDay && n(d.pagamentoCheckoutPrev) > 0) {
+        cassa -= n(d.pagamentoCheckoutPrev);
+      }
+      return a + cassa;
+    }, 0);
+    // Aggiungi il checkout di QUESTA tappa: si trova come pagamentoCheckoutPrev
+    // sul primo giorno della tappa successiva (che ha prevIdTappa === t.idTappa)
+    const nextSharedDay = data.find(d => d.prevIdTappa === t.idTappa && n(d.pagamentoCheckoutPrev) > 0);
+    const spesoTappa = spesoBase + (nextSharedDay ? n(nextSharedDay.pagamentoCheckoutPrev) : 0);
+
+    const residuo = disponibile - spesoTappa;
     riporto = residuo;
     return { t, ti, allocato, prevRiporto, disponibile, spesoTappa, residuo };
   });
@@ -4005,7 +4024,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.3 · Firebase · GitHub Pages
+        CamperHub v9.4 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4548,7 +4567,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.3</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.4</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
