@@ -1808,9 +1808,7 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
       <div style={{marginTop:16}}>
         <div className="section-title" style={{marginBottom:10}}>⛽ Carburante per questa tappa</div>
         <p style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>
-          {notti===0
-            ? "KM e costo verranno inseriti nel giorno stesso della tappa di transito. Se già presenti da un'altra tappa, verranno sommati."
-            : "KM e costo verranno inseriti nel giorno di viaggio (il giorno prima del check-in)."}
+          KM e costo vengono inseriti nel <strong>giorno di check-in</strong> della tappa, insieme a traghetto e tutte le spese di viaggio.
         </p>
         <div className="form-grid" style={{gap:10}}>
           <div className="field">
@@ -2341,12 +2339,12 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
     }
 
-    // Km e carburante → giorno prima del check-in
-    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
+    // Km, carburante e traghetto → tutti sul giorno di check-in (sIdx)
+    // così rimangono attribuiti correttamente alla tappa di competenza
     if(n(form.kmTappa)>0)
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
+      copy[tab][sIdx]={...copy[tab][sIdx], km: n(form.kmTappa)};
     if(n(form.costoCarburante)>0)
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
+      copy[tab][sIdx]={...copy[tab][sIdx], gasolio: n(form.costoCarburante)};
     // Traghetto → sempre sul giorno di check-in (appartiene alla tappa che arriva)
     if(n(form.costoTraghetto)>0)
       copy[tab][sIdx]={...copy[tab][sIdx], traghetto: n(copy[tab][sIdx].traghetto) + n(form.costoTraghetto)};
@@ -2417,41 +2415,49 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     if(!dailyChanged){
       const copy = {...viaggio,[tab]:[...viaggio[tab]],
         tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
-      const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
 
-      // Auto-repair km/gasolio: ripristina i valori sul fuelIdx se sono stati azzerati/corrotti.
-      // Sicuro solo quando fuelIdx === sIdx (prima tappa: il giorno carburante è lo stesso check-in).
-      if(fuelIdx === sIdx){
-        const fuelDay = copy[tab][fuelIdx];
+      // Migrazione: sposta km/gasolio/traghetto da sIdx-1 (vecchio codice) a sIdx se necessario
+      if(sIdx > 0){
         const wantKm  = n(oldTappa.kmTappa||0);
         const wantGas = n(oldTappa.costoCarburante||0);
-        if(wantKm  > 0 && n(fuelDay.km)      !== wantKm)  copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: wantKm};
-        if(wantGas > 0 && n(copy[tab][fuelIdx].gasolio) !== wantGas) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: wantGas};
-      }
-
-      // Migrazione traghetto: se è sul giorno sbagliato (sIdx-1 = old code), spostalo su sIdx
-      const oldTrag = n(oldTappa.costoTraghetto||0);
-      if(oldTrag > 0 && sIdx > 0){
+        const wantTrag= n(oldTappa.costoTraghetto||0);
         const prevD = copy[tab][sIdx-1];
         const curD  = copy[tab][sIdx];
-        if(n(prevD.traghetto) >= oldTrag && n(curD.traghetto) < oldTrag){
-          copy[tab][sIdx-1] = {...prevD, traghetto: Math.max(0, n(prevD.traghetto) - oldTrag)};
-          copy[tab][sIdx]   = {...curD,  traghetto: n(curD.traghetto) + oldTrag};
+        if(wantKm  >0 && n(prevD.km)      >=wantKm  && n(curD.km)      <wantKm){
+          copy[tab][sIdx-1]={...copy[tab][sIdx-1], km:      Math.max(0,n(copy[tab][sIdx-1].km)-wantKm)};
+          copy[tab][sIdx]  ={...copy[tab][sIdx],   km:      n(copy[tab][sIdx].km)+wantKm};
+        }
+        if(wantGas >0 && n(prevD.gasolio) >=wantGas && n(copy[tab][sIdx].gasolio)<wantGas){
+          copy[tab][sIdx-1]={...copy[tab][sIdx-1], gasolio: Math.max(0,n(copy[tab][sIdx-1].gasolio)-wantGas)};
+          copy[tab][sIdx]  ={...copy[tab][sIdx],   gasolio: n(copy[tab][sIdx].gasolio)+wantGas};
+        }
+        if(wantTrag>0 && n(prevD.traghetto)>=wantTrag && n(copy[tab][sIdx].traghetto)<wantTrag){
+          copy[tab][sIdx-1]={...copy[tab][sIdx-1], traghetto:Math.max(0,n(copy[tab][sIdx-1].traghetto)-wantTrag)};
+          copy[tab][sIdx]  ={...copy[tab][sIdx],   traghetto:n(copy[tab][sIdx].traghetto)+wantTrag};
         }
       }
+      // Auto-repair: se il valore è sul giorno check-in ma errato (es. azzerato da migrazione T8)
+      const curD2 = copy[tab][sIdx];
+      const wantKm2 = n(oldTappa.kmTappa||0), wantGas2 = n(oldTappa.costoCarburante||0);
+      if(wantKm2 >0 && n(curD2.km)      !==wantKm2)  copy[tab][sIdx]={...copy[tab][sIdx], km:      wantKm2};
+      if(wantGas2>0 && n(copy[tab][sIdx].gasolio)!==wantGas2) copy[tab][sIdx]={...copy[tab][sIdx], gasolio: wantGas2};
+
       updateTrip(copy);
       setEditingTappa(null);
       return;
     }
 
     // ── FULL RE-APPLY ────────────────────────────────────────────────────
-    // Prima svuota vecchia posizione traghetto (sIdx-1, dove lo metteva il vecchio codice)
+    // Prima svuota vecchia posizione (sIdx-1) da km/gasolio/traghetto (codice vecchio)
     const baseCopy = [...viaggio[tab]];
     const oldTrag = n(oldTappa.costoTraghetto||0);
-    if(oldTrag > 0 && sIdx > 0){
+    const oldKm_  = n(oldTappa.kmTappa||0);
+    const oldGas_ = n(oldTappa.costoCarburante||0);
+    if(sIdx > 0){
       const prevD = baseCopy[sIdx-1];
-      if(n(prevD.traghetto) >= oldTrag)
-        baseCopy[sIdx-1] = {...prevD, traghetto: Math.max(0, n(prevD.traghetto) - oldTrag)};
+      if(oldTrag >0 && n(prevD.traghetto)>=oldTrag) baseCopy[sIdx-1]={...baseCopy[sIdx-1], traghetto:Math.max(0,n(baseCopy[sIdx-1].traghetto)-oldTrag)};
+      if(oldKm_  >0 && n(prevD.km)      >=oldKm_)  baseCopy[sIdx-1]={...baseCopy[sIdx-1], km:       Math.max(0,n(baseCopy[sIdx-1].km)-oldKm_)};
+      if(oldGas_ >0 && n(prevD.gasolio) >=oldGas_) baseCopy[sIdx-1]={...baseCopy[sIdx-1], gasolio:  Math.max(0,n(baseCopy[sIdx-1].gasolio)-oldGas_)};
     }
     const copy = {...viaggio,[tab]:baseCopy.map(d=>{
       if(d.idTappa!==oldTappa.idTappa) return d;
@@ -2490,11 +2496,10 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     }
     if(pagamentoCheckoutPrev>0) copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
 
-    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
-    if(n(form.kmTappa)>0)        copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
-    if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
-    if(n(form.costoTraghetto)>0)
-      copy[tab][sIdx]={...copy[tab][sIdx], traghetto: n(form.costoTraghetto)};
+    // km/gasolio/traghetto → tutti su sIdx (check-in), attribuiti alla tappa corretta
+    if(n(form.kmTappa)>0)        copy[tab][sIdx]={...copy[tab][sIdx], km:       n(form.kmTappa)};
+    if(n(form.costoCarburante)>0) copy[tab][sIdx]={...copy[tab][sIdx], gasolio:  n(form.costoCarburante)};
+    if(n(form.costoTraghetto)>0)  copy[tab][sIdx]={...copy[tab][sIdx], traghetto:n(form.costoTraghetto)};
     updateTrip(copy);
     setEditingTappa(null);
   };
