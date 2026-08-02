@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.8</title>
+<title>🚐 CamperHub v9.9</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1425,10 +1425,12 @@ function DayModal({dayIndex, data, budget, onClose, onChange, consumoMedio, prez
 function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit}){
   const totalAllocato = tappe.reduce((a,t)=>a+n(t.budgetAllocato),0);
   const nonAllocato   = budget - totalAllocato;
+  // Ordina tappe per data check-in
+  const tappeOrd = [...tappe].sort((a,b)=>(a.startDate||'')>(b.startDate||'')?1:-1);
 
   // Build chain: compute riporto progressively
   let riporto = 0;
-  const chain = tappe.map((t, ti) => {
+  const chain = tappeOrd.map((t, ti) => {
     const allocato    = n(t.budgetAllocato);
     const prevRiporto = riporto;
     const disponibile = allocato + prevRiporto;
@@ -2276,31 +2278,82 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
 
     // ── SHORT-CIRCUIT: se nessun campo che impatta i giorni è cambiato, ──
     // aggiorna solo i metadati della tappa senza toccare il daily data
+    // (NON applicato alle tapppe di transito che potrebbero avere dati su giorno sbagliato)
+    const isTransit = eIdx===sIdx;
     const DAILY_FIELDS = ['startDate','endDate','luogo','struttura','costoPiazzola',
       'costoPersona','numeroPersone','elettricita','moto','tassaSoggiorno',
       'costoDoccia','extraStruttura','kmTappa','costoCarburante','costoTraghetto','traghettoGiorno'];
     const dailyChanged = DAILY_FIELDS.some(k => String(form[k]??'') !== String(oldTappa[k]??''));
-    if(!dailyChanged){
+    if(!dailyChanged && !isTransit){
       const copy = {...viaggio,
         tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
       updateTrip(copy);
       setEditingTappa(null);
       return;
     }
+    if(!dailyChanged && isTransit){
+      // Short-circuit solo metadata + migrazione traghetto/km al giorno corretto
+      const copy = {...viaggio,[tab]:[...viaggio[tab]],
+        tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
+      // Migra vecchi dati da sIdx-1 → sIdx se necessario
+      if(sIdx > 0){
+        const prevD = copy[tab][sIdx-1];
+        const curD  = copy[tab][sIdx];
+        const oldKm  = n(oldTappa.kmTappa||0);
+        const oldGas = n(oldTappa.costoCarburante||0);
+        const oldTrag= n(oldTappa.costoTraghetto||0);
+        // Se i vecchi valori sono su sIdx-1 (codice vecchio) e NON già su sIdx, sposta
+        if(oldKm>0 && n(prevD.km)>=oldKm && n(curD.km)<oldKm){
+          copy[tab][sIdx-1]={...prevD, km:Math.max(0,n(prevD.km)-oldKm)};
+          copy[tab][sIdx]={...curD, km:n(curD.km)+oldKm};
+        }
+        if(oldGas>0 && n(prevD.gasolio)>=oldGas && n(curD.gasolio)<oldGas){
+          copy[tab][sIdx-1]={...copy[tab][sIdx-1], gasolio:Math.max(0,n(copy[tab][sIdx-1].gasolio)-oldGas)};
+          copy[tab][sIdx]={...copy[tab][sIdx], gasolio:n(copy[tab][sIdx].gasolio)+oldGas};
+        }
+        if(oldTrag>0 && n(prevD.traghetto)>=oldTrag && n(curD.traghetto)<oldTrag){
+          copy[tab][sIdx-1]={...copy[tab][sIdx-1], traghetto:Math.max(0,n(copy[tab][sIdx-1].traghetto)-oldTrag)};
+          copy[tab][sIdx]={...copy[tab][sIdx], traghetto:n(copy[tab][sIdx].traghetto)+oldTrag};
+        }
+      }
+      updateTrip(copy);
+      setEditingTappa(null);
+      return;
+    }
 
     // ── FULL RE-APPLY: dates o costi cambiati ────────────────────────────
-    const copy = {...viaggio,[tab]:[...viaggio[tab]].map(d=>{
+    // Per transit: prima migra vecchi dati da sIdx-1 se necessario
+    const fullCopy = [...viaggio[tab]];
+    if(isTransit && sIdx > 0){
+      const prevD = fullCopy[sIdx-1];
+      const curD  = fullCopy[sIdx];
+      const oldKm  = n(oldTappa.kmTappa||0);
+      const oldGas = n(oldTappa.costoCarburante||0);
+      const oldTrag= n(oldTappa.costoTraghetto||0);
+      if(oldKm>0 && n(prevD.km)>=oldKm && n(curD.km)<oldKm){
+        fullCopy[sIdx-1]={...prevD, km:Math.max(0,n(prevD.km)-oldKm)};
+        fullCopy[sIdx]={...curD, km:n(curD.km)+oldKm};
+      }
+      if(oldGas>0 && n(prevD.gasolio)>=oldGas && n(curD.gasolio)<oldGas){
+        fullCopy[sIdx-1]={...fullCopy[sIdx-1], gasolio:Math.max(0,n(fullCopy[sIdx-1].gasolio)-oldGas)};
+        fullCopy[sIdx]={...fullCopy[sIdx], gasolio:n(fullCopy[sIdx].gasolio)+oldGas};
+      }
+      if(oldTrag>0 && n(prevD.traghetto)>=oldTrag && n(curD.traghetto)<oldTrag){
+        fullCopy[sIdx-1]={...fullCopy[sIdx-1], traghetto:Math.max(0,n(fullCopy[sIdx-1].traghetto)-oldTrag)};
+        fullCopy[sIdx]={...fullCopy[sIdx], traghetto:n(fullCopy[sIdx].traghetto)+oldTrag};
+      }
+    }
+    const copy = {...viaggio,[tab]:[...fullCopy].map(d=>{
       if(d.idTappa!==oldTappa.idTappa) return d;
       if(d.prevIdTappa){
-        const prevT = (viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
-        return {...d, idTappa:d.prevIdTappa, luogo:prevT?.luogo||"", struttura:prevT?.struttura||"",
-          piazzola:0, tassa:0, doccia:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+        const prevT=(viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
+        return {...d,idTappa:d.prevIdTappa,luogo:prevT?.luogo||"",struttura:prevT?.struttura||"",
+          piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
       }
-      return {...d, idTappa:"", luogo:"", struttura:"", piazzola:0, tassa:0, doccia:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
-    }), tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...t,...form,idTappa:oldTappa.idTappa}:t)};
+      return {...d,idTappa:"",luogo:"",struttura:"",piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
+    }),tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...t,...form,idTappa:oldTappa.idTappa}:t)};
 
-    const isTransit = eIdx===sIdx;
-    const piaz   = isTransit ? 0 : n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
+    const piaz  = isTransit ? 0 : n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
     const tassa  = isTransit ? 0 : n(form.tassaSoggiorno)*n(form.numeroPersone);
     const doccia = isTransit ? 0 : n(form.costoDoccia);
 
@@ -2318,24 +2371,19 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     }
 
     if(isTransit){
-      // Tappa transito: giorno unico senza costi struttura
       copy[tab][sIdx]={...copy[tab][sIdx],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,
         piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
     } else {
       const existingEidxDay = copy[tab][eIdx];
       const eIdxOwnedByOther = existingEidxDay.idTappa && existingEidxDay.idTappa !== oldTappa.idTappa;
       if(eIdxOwnedByOther){
-        // Il giorno eIdx appartiene già alla tappa successiva:
-        // aggiorna solo il pagamentoCheckoutPrev con il nuovo checkout di questa tappa
         const newCheckout = copy[tab].reduce((a,x)=>x.idTappa===oldTappa.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
         copy[tab][eIdx]={...existingEidxDay, pagamentoCheckoutPrev:newCheckout, prevIdTappa:oldTappa.idTappa};
       } else {
-        // Giorno di checkout libero
         copy[tab][eIdx]={...existingEidxDay,idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,
           piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
       }
     }
-    // Ripristina checkout tappa precedente su sIdx (giorno condiviso in entrata)
     if(pagamentoCheckoutPrev>0) copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
 
     const fuelIdx = isTransit ? sIdx : (sIdx > 0 ? sIdx - 1 : sIdx);
@@ -4230,7 +4278,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.8 · Firebase · GitHub Pages
+        CamperHub v9.9 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4773,7 +4821,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.8</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.9</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
