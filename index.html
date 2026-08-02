@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.10</title>
+<title>🚐 CamperHub v10.0</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1726,20 +1726,13 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
 
   return (
     <Modal title={isEdit?"✏️ Modifica tappa":"Nuova tappa"} onClose={onClose} width="640px">
-      {/* Badge tappa di transito */}
-      {notti===0&&(
-        <div style={{background:'rgba(79,216,180,.1)',border:'1px solid var(--primary-dim)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'var(--primary)'}}>
-          🚌 <strong>Tappa di transito</strong> — stessa giornata, 0 notti.<br/>
-          <span style={{fontSize:11,color:'var(--text2)'}}>Utile per km di partenza/rientro e traghetto. I costi struttura sono nascosti.</span>
-        </div>
-      )}
       <div className="form-grid" style={{gap:12}}>
         <div className="field">
           <label className="field-label">Check-in</label>
           <input type="date" className="field-input" value={f.startDate} onChange={e=>u("startDate",e.target.value)}/>
         </div>
         <div className="field">
-          <label className="field-label">Check-out {notti===0&&<span style={{fontSize:10,color:'var(--primary)'}}>(= check-in → transito)</span>}</label>
+          <label className="field-label">Check-out</label>
           <input type="date" className="field-input" value={f.endDate} onChange={e=>u("endDate",e.target.value)}/>
         </div>
         <div className="field" style={{gridColumn:'1/-1'}}>
@@ -1749,18 +1742,15 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
         <StrutturaPicker strutture={strutture} strutturaId={f.strutturaId} strutturaText={f.struttura}
           tappaDate={f.startDate} onSelect={onSelectStruttura}
           onAddNew={nome=>{if(onAddStruttura)onAddStruttura(nome,onSelectStruttura);}}/>
-        {/* Campi struttura — solo se notti > 0 */}
-        {notti>0&&(<>
-          <NumField label="Costo piazzola €/notte"          value={f.costoPiazzola}  onChange={v=>u("costoPiazzola",v)}/>
-          <NumField label="Costo a persona €/notte"          value={f.costoPersona}   onChange={v=>u("costoPersona",v)}/>
-          <NumField label="Numero persone"                   value={f.numeroPersone}  onChange={v=>{u("numeroPersone",v);const s=strutture.find(x=>x.id===f.strutturaId);const t=findTariff(s,f.startDate);if(t&&t.doccia)u("costoDoccia",n(t.doccia)*v*2);}}/>
-          <NumField label="Elettricità €/notte"              value={f.elettricita}    onChange={v=>u("elettricita",v)}/>
-          <NumField label="Moto €/notte"                     value={f.moto}           onChange={v=>u("moto",v)}/>
-          <NumField label="Tassa soggiorno €/pers/notte"     value={f.tassaSoggiorno} onChange={v=>u("tassaSoggiorno",v)}/>
-          <NumField label="Doccia €/notte (auto: €doccia×pers×2)" value={f.costoDoccia} onChange={v=>u("costoDoccia",v)}/>
-          <NumField label="Extra struttura €/notte"          value={f.extraStruttura} onChange={v=>u("extraStruttura",v)}/>
-          <NumField label="Budget allocato € (opzionale)"    value={f.budgetAllocato} onChange={v=>u("budgetAllocato",v)} placeholder="0 = non definito"/>
-        </>)}
+        <NumField label="Costo piazzola €/notte"          value={f.costoPiazzola}  onChange={v=>u("costoPiazzola",v)}/>
+        <NumField label="Costo a persona €/notte"          value={f.costoPersona}   onChange={v=>u("costoPersona",v)}/>
+        <NumField label="Numero persone"                   value={f.numeroPersone}  onChange={v=>{u("numeroPersone",v);const s=strutture.find(x=>x.id===f.strutturaId);const t=findTariff(s,f.startDate);if(t&&t.doccia)u("costoDoccia",n(t.doccia)*v*2);}}/>
+        <NumField label="Elettricità €/notte"              value={f.elettricita}    onChange={v=>u("elettricita",v)}/>
+        <NumField label="Moto €/notte"                     value={f.moto}           onChange={v=>u("moto",v)}/>
+        <NumField label="Tassa soggiorno €/pers/notte"     value={f.tassaSoggiorno} onChange={v=>u("tassaSoggiorno",v)}/>
+        <NumField label="Doccia €/notte (auto: €doccia×pers×2)" value={f.costoDoccia} onChange={v=>u("costoDoccia",v)}/>
+        <NumField label="Extra struttura €/notte"          value={f.extraStruttura} onChange={v=>u("extraStruttura",v)}/>
+        <NumField label="Budget allocato € (opzionale)"    value={f.budgetAllocato} onChange={v=>u("budgetAllocato",v)} placeholder="0 = non definito"/>
       </div>
 
       {/* Sezione traghetto */}
@@ -2169,6 +2159,105 @@ function FillDaysModal({data, onApply, onClose}){
   );
 }
 
+// ── RientroModal ─────────────────────────────────────────────────────────────
+function RientroModal({viaggio, tab, onClose, onSave}){
+  const consumoMedio = n(viaggio.consumoMedio);
+  const days = viaggio[tab]||[];
+  const lastDay = days[days.length-1];
+  const [f,setF] = React.useState({
+    km:         n(lastDay?.km)||0,
+    gasolio:    n(lastDay?.gasolio)||0,
+    pedaggi:    n(lastDay?.pedaggi)||0,
+    traghetto:  n(lastDay?.traghetto)||0,
+    cena:       n(lastDay?.cena)||0,
+    colazione:  n(lastDay?.colazione)||0,
+    prezzoLitro:0,
+  });
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  const litriStimati = consumoMedio>0&&n(f.km)>0 ? n(f.km)*consumoMedio/100 : 0;
+  const costoStimato = litriStimati>0&&n(f.prezzoLitro)>0 ? litriStimati*n(f.prezzoLitro) : 0;
+  const onKmChange = v => {
+    u("km",v);
+    if(n(f.prezzoLitro)>0&&consumoMedio>0&&v>0)
+      setF(p=>({...p,km:v,gasolio:roundTo10(v*consumoMedio/100*n(p.prezzoLitro))}));
+  };
+  const onPrezzoLitro = v => {
+    u("prezzoLitro",v);
+    if(litriStimati>0&&v>0) setF(p=>({...p,prezzoLitro:v,gasolio:roundTo10(litriStimati*v)}));
+  };
+  const save = () => {
+    const lastIdx = days.length-1;
+    const copy = {...viaggio,[tab]:[...days]};
+    copy[tab][lastIdx]={...copy[tab][lastIdx],
+      km:n(f.km), gasolio:n(f.gasolio), pedaggi:n(f.pedaggi),
+      traghetto:n(f.traghetto), cena:n(f.cena), colazione:n(f.colazione)};
+    onSave(copy);
+    onClose();
+  };
+  return(
+    <Modal title="🏁 Spese di rientro" onClose={onClose} width="480px">
+      <div style={{fontSize:11,color:'var(--text2)',marginBottom:12,background:'var(--card2)',borderRadius:8,padding:'8px 12px'}}>
+        Le spese vengono registrate nell'<strong>ultimo giorno del viaggio</strong> ({lastDay?fmtDate(lastDay.date):'—'}).
+      </div>
+      <div className="section-title" style={{marginBottom:8}}>🚗 Viaggio</div>
+      <div className="form-grid" style={{gap:10,marginBottom:14}}>
+        <div className="field">
+          <label className="field-label">KM percorsi</label>
+          <input type="number" className="field-input" value={f.km||""} placeholder="es. 180"
+            onFocus={e=>e.target.select()} onChange={e=>onKmChange(+e.target.value||0)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Prezzo diesel €/litro</label>
+          <input type="number" className="field-input" value={f.prezzoLitro||""} placeholder="es. 1.72"
+            onFocus={e=>e.target.select()} onChange={e=>onPrezzoLitro(+e.target.value||0)}/>
+        </div>
+        {litriStimati>0&&(
+          <div className="field" style={{gridColumn:'1/-1'}}>
+            <div className="tappa-summary" style={{marginTop:0}}>
+              {consumoMedio>0&&<div><span>Consumo</span><strong>{consumoMedio} l/100km</strong></div>}
+              <div><span>Litri stimati</span><strong style={{color:"var(--accent)"}}>{litriStimati.toFixed(1)} L</strong></div>
+              {costoStimato>0&&<><div><span>Stimato</span><strong style={{color:"var(--accent)"}}>€{fmt2(costoStimato)}</strong></div>
+              <div><span>→ Arrotondato</span><strong style={{color:"var(--green)"}}>€{roundTo10(costoStimato)}</strong></div></>}
+            </div>
+          </div>
+        )}
+        <div className="field">
+          <label className="field-label">💳 Carburante €</label>
+          <input type="number" className="field-input" value={f.gasolio||""} placeholder="0"
+            onFocus={e=>e.target.select()} onChange={e=>u("gasolio",+e.target.value||0)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Pedaggi €</label>
+          <input type="number" className="field-input" value={f.pedaggi||""} placeholder="0"
+            onFocus={e=>e.target.select()} onChange={e=>u("pedaggi",+e.target.value||0)}/>
+        </div>
+        <div className="field" style={{gridColumn:'1/-1'}}>
+          <label className="field-label">🚢 Traghetto € (se previsto)</label>
+          <input type="number" className="field-input" value={f.traghetto||""} placeholder="0"
+            onFocus={e=>e.target.select()} onChange={e=>u("traghetto",+e.target.value||0)}/>
+        </div>
+      </div>
+      <div className="section-title" style={{marginBottom:8}}>🍽️ Vitto</div>
+      <div className="form-grid" style={{gap:10,marginBottom:14}}>
+        <div className="field">
+          <label className="field-label">Pranzo/Cena €</label>
+          <input type="number" className="field-input" value={f.cena||""} placeholder="0"
+            onFocus={e=>e.target.select()} onChange={e=>u("cena",+e.target.value||0)}/>
+        </div>
+        <div className="field">
+          <label className="field-label">Colazione €</label>
+          <input type="number" className="field-input" value={f.colazione||""} placeholder="0"
+            onFocus={e=>e.target.select()} onChange={e=>u("colazione",+e.target.value||0)}/>
+        </div>
+      </div>
+      <div className="btn-row">
+        <button className="btn-primary" onClick={save}>✓ Salva rientro</button>
+        <button className="btn" onClick={onClose}>Annulla</button>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Trip View ──────────────────────────────────────────────────────────────
 function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[], strutture=[], onUpdateStrutture, veicoli=[], onUpdateVeicoli}){
   useBack(back);
@@ -2183,6 +2272,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
   const [dayModal, setDayModal] = React.useState(null);
   const [viewMode, setViewMode] = React.useState("panoramica");
   const [showFillDays, setShowFillDays] = React.useState(false);
+  const [showRientro, setShowRientro] = React.useState(false);
   const data = viaggio[tab];
 
   const fillDays = (cat, amount, indices) => {
@@ -2202,14 +2292,13 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     const norm = d => (d||"").slice(0,10);
     const sIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.startDate));
     const eIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.endDate));
-    if(sIdx===-1||eIdx===-1||eIdx<sIdx){ alert("Controlla le date della tappa (devono rientrare nel periodo del viaggio)"); return; }
+    if(sIdx===-1||eIdx===-1||eIdx<=sIdx){ alert("Controlla le date della tappa (check-out deve essere dopo il check-in)"); return; }
     const copy  = {...viaggio,[tab]:[...viaggio[tab]],tappe:[...(viaggio.tappe||[])]};
     const idN   = (viaggio.tappe||[]).filter(x=>x.target===tab).length+1;
     const idT   = `T${idN}`;
-    const isTransit = eIdx===sIdx; // tappa di transito: stessa giornata
-    const piaz  = isTransit ? 0 : n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
-    const tassa = isTransit ? 0 : n(form.tassaSoggiorno)*n(form.numeroPersone);
-    const doccia = isTransit ? 0 : n(form.costoDoccia);
+    const piaz  = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
+    const tassa = n(form.tassaSoggiorno)*n(form.numeroPersone);
+    const doccia = n(form.costoDoccia);
     // salvo il suo pagamento checkout come campo separato prima di sovrascrivere
     const dayAtSIdx = copy[tab][sIdx];
     let pagamentoCheckoutPrev = 0;
@@ -2222,32 +2311,21 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     for(let i=sIdx;i<eIdx;i++){
       copy[tab][i]={...copy[tab][i],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,doccia,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
     }
-    // checkout day (o giorno unico se transito)
-    if(isTransit){
-      copy[tab][sIdx]={...copy[tab][sIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
-    } else {
-      copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
-    }
+    // Giorno di checkout
+    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
 
     if(pagamentoCheckoutPrev > 0){
       copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
     }
 
-    // Km e carburante:
-    // - tappa normale → giorno PRIMA del check-in (come sempre)
-    // - tappa di transito → giorno STESSO (non c'è "prima"), somma se già presenti
-    const fuelIdx = isTransit ? sIdx : (sIdx > 0 ? sIdx - 1 : sIdx);
-    if(n(form.kmTappa)>0){
-      const kmPrev = isTransit ? n(copy[tab][fuelIdx].km) : 0;
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: kmPrev + n(form.kmTappa)};
-    }
-    if(n(form.costoCarburante)>0){
-      const gasPrev = isTransit ? n(copy[tab][fuelIdx].gasolio) : 0;
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: gasPrev + n(form.costoCarburante)};
-    }
-    // Traghetto → somma sempre (può coesistere con altri costi nello stesso giorno)
+    // Km e carburante → giorno prima del check-in
+    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
+    if(n(form.kmTappa)>0)
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
+    if(n(form.costoCarburante)>0)
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
     if(n(form.costoTraghetto)>0){
-      const tragIdx = isTransit ? sIdx : (form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx);
+      const tragIdx = form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx;
       copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(copy[tab][tragIdx].traghetto) + n(form.costoTraghetto)};
     }
 
@@ -2279,71 +2357,27 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     // ── SHORT-CIRCUIT: se nessun campo che impatta i giorni è cambiato, ──
     // aggiorna solo i metadati della tappa senza toccare il daily data
     // (NON applicato alle tapppe di transito che potrebbero avere dati su giorno sbagliato)
-    const isTransit = eIdx===sIdx;
+    if(sIdx===-1||eIdx===-1||eIdx<=sIdx){ alert("Controlla le date della tappa"); return; }
+
+    // ── SHORT-CIRCUIT: nessun campo giornaliero cambiato → solo metadata ──
     const DAILY_FIELDS = ['startDate','endDate','luogo','struttura','costoPiazzola',
       'costoPersona','numeroPersone','elettricita','moto','tassaSoggiorno',
       'costoDoccia','extraStruttura','kmTappa','costoCarburante','costoTraghetto','traghettoGiorno'];
-    // Normalizza i valori default per evitare falsi positivi su campi non presenti in tapppe vecchie
     const normF = (k,v) => {
-      if(v===undefined||v===null) { if(k==='traghettoGiorno') return 'partenza'; return ''; }
+      if(v===undefined||v===null){ if(k==='traghettoGiorno') return 'partenza'; return ''; }
       return String(v);
     };
     const dailyChanged = DAILY_FIELDS.some(k => normF(k,form[k]) !== normF(k,oldTappa[k]));
-    if(!dailyChanged && !isTransit){
+    if(!dailyChanged){
       const copy = {...viaggio,
         tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
       updateTrip(copy);
       setEditingTappa(null);
       return;
     }
-    if(!dailyChanged && isTransit){
-      // Short-circuit solo metadata + migrazione traghetto/km al giorno corretto
-      const copy = {...viaggio,[tab]:[...viaggio[tab]],
-        tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
-      // Migra vecchi dati da sIdx-1 → sIdx se necessario
-      if(sIdx > 0){
-        const prevD = copy[tab][sIdx-1];
-        const curD  = copy[tab][sIdx];
-        const oldKm  = n(oldTappa.kmTappa||0);
-        const oldGas = n(oldTappa.costoCarburante||0);
-        const oldTrag= n(oldTappa.costoTraghetto||0);
-        // Se i vecchi valori sono su sIdx-1 (codice vecchio) e NON già su sIdx, sposta
-        if(oldKm>0 && n(prevD.km)>=oldKm && n(curD.km)<oldKm){
-          copy[tab][sIdx-1]={...prevD, km:Math.max(0,n(prevD.km)-oldKm)};
-          copy[tab][sIdx]={...curD, km:n(curD.km)+oldKm};
-        }
-        if(oldGas>0 && n(prevD.gasolio)>=oldGas && n(curD.gasolio)<oldGas){
-          copy[tab][sIdx-1]={...copy[tab][sIdx-1], gasolio:Math.max(0,n(copy[tab][sIdx-1].gasolio)-oldGas)};
-          copy[tab][sIdx]={...copy[tab][sIdx], gasolio:n(copy[tab][sIdx].gasolio)+oldGas};
-        }
-        if(oldTrag>0 && n(prevD.traghetto)>=oldTrag && n(curD.traghetto)<oldTrag){
-          copy[tab][sIdx-1]={...copy[tab][sIdx-1], traghetto:Math.max(0,n(copy[tab][sIdx-1].traghetto)-oldTrag)};
-          copy[tab][sIdx]={...copy[tab][sIdx], traghetto:n(copy[tab][sIdx].traghetto)+oldTrag};
-        }
-      }
-      updateTrip(copy);
-      setEditingTappa(null);
-      return;
-    }
 
-    // ── FULL RE-APPLY: dates o costi cambiati ────────────────────────────
-    // Per transit: prima migra vecchi dati da sIdx-1 se necessario
-    const fullCopy = [...viaggio[tab]];
-    if(isTransit && sIdx > 0){
-      // Migrazione: svuota vecchia posizione (sIdx-1) senza spostare su sIdx.
-      // Il FULL RE-APPLY scriverà fresh su sIdx tramite il blocco fuel/traghetto sotto.
-      const prevD = fullCopy[sIdx-1];
-      const oldKm  = n(oldTappa.kmTappa||0);
-      const oldGas = n(oldTappa.costoCarburante||0);
-      const oldTrag= n(oldTappa.costoTraghetto||0);
-      if(oldKm>0  && n(prevD.km)>=oldKm)
-        fullCopy[sIdx-1]={...fullCopy[sIdx-1], km:Math.max(0,n(fullCopy[sIdx-1].km)-oldKm)};
-      if(oldGas>0 && n(prevD.gasolio)>=oldGas)
-        fullCopy[sIdx-1]={...fullCopy[sIdx-1], gasolio:Math.max(0,n(fullCopy[sIdx-1].gasolio)-oldGas)};
-      if(oldTrag>0 && n(prevD.traghetto)>=oldTrag)
-        fullCopy[sIdx-1]={...fullCopy[sIdx-1], traghetto:Math.max(0,n(fullCopy[sIdx-1].traghetto)-oldTrag)};
-    }
-    const copy = {...viaggio,[tab]:[...fullCopy].map(d=>{
+    // ── FULL RE-APPLY ────────────────────────────────────────────────────
+    const copy = {...viaggio,[tab]:[...viaggio[tab]].map(d=>{
       if(d.idTappa!==oldTappa.idTappa) return d;
       if(d.prevIdTappa){
         const prevT=(viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
@@ -2353,50 +2387,39 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       return {...d,idTappa:"",luogo:"",struttura:"",piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
     }),tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...t,...form,idTappa:oldTappa.idTappa}:t)};
 
-    const piaz  = isTransit ? 0 : n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
-    const tassa  = isTransit ? 0 : n(form.tassaSoggiorno)*n(form.numeroPersone);
-    const doccia = isTransit ? 0 : n(form.costoDoccia);
+    const piaz  = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
+    const tassa = n(form.tassaSoggiorno)*n(form.numeroPersone);
+    const doccia = n(form.costoDoccia);
 
     const dayAtSIdx = copy[tab][sIdx];
     let pagamentoCheckoutPrev = 0, prevIdTappa = "";
-    if(!isTransit && dayAtSIdx.idTappa && dayAtSIdx.idTappa !== oldTappa.idTappa){
+    if(dayAtSIdx.idTappa && dayAtSIdx.idTappa !== oldTappa.idTappa){
       prevIdTappa = dayAtSIdx.idTappa;
       pagamentoCheckoutPrev = copy[tab].reduce((a,x)=>x.idTappa===prevIdTappa?a+n(x.piazzola)+n(x.tassa):a,0);
     }
 
-    // Applica tappa ai giorni interni (sIdx→eIdx-1)
     for(let i=sIdx;i<eIdx;i++){
       copy[tab][i]={...copy[tab][i],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,
         piazzola:piaz,tassa,doccia,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
     }
 
-    if(isTransit){
-      copy[tab][sIdx]={...copy[tab][sIdx],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,
-        piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
+    const existingEidxDay = copy[tab][eIdx];
+    const eIdxOwnedByOther = existingEidxDay.idTappa && existingEidxDay.idTappa !== oldTappa.idTappa;
+    if(eIdxOwnedByOther){
+      const newCheckout = copy[tab].reduce((a,x)=>x.idTappa===oldTappa.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
+      copy[tab][eIdx]={...existingEidxDay, pagamentoCheckoutPrev:newCheckout, prevIdTappa:oldTappa.idTappa};
     } else {
-      const existingEidxDay = copy[tab][eIdx];
-      const eIdxOwnedByOther = existingEidxDay.idTappa && existingEidxDay.idTappa !== oldTappa.idTappa;
-      if(eIdxOwnedByOther){
-        const newCheckout = copy[tab].reduce((a,x)=>x.idTappa===oldTappa.idTappa?a+n(x.piazzola)+n(x.tassa):a,0);
-        copy[tab][eIdx]={...existingEidxDay, pagamentoCheckoutPrev:newCheckout, prevIdTappa:oldTappa.idTappa};
-      } else {
-        copy[tab][eIdx]={...existingEidxDay,idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,
-          piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
-      }
+      copy[tab][eIdx]={...existingEidxDay,idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,
+        piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
     }
     if(pagamentoCheckoutPrev>0) copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
 
-    const fuelIdx = isTransit ? sIdx : (sIdx > 0 ? sIdx - 1 : sIdx);
-    if(n(form.kmTappa)>0){
-      // FULL RE-APPLY: scrittura fresca (il giorno è stato resettato dal blocco clear sopra)
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
-    }
-    if(n(form.costoCarburante)>0){
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
-    }
+    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
+    if(n(form.kmTappa)>0)        copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
+    if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
     if(n(form.costoTraghetto)>0){
-      const tragIdx = isTransit ? sIdx : (form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx);
-      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(form.costoTraghetto)};
+      const tragIdx = form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx;
+      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(copy[tab][tragIdx].traghetto) + n(form.costoTraghetto)};
     }
     updateTrip(copy);
     setEditingTappa(null);
@@ -2443,6 +2466,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
           <div style={{marginLeft:"auto",display:"flex",gap:5,flexShrink:0}}>
             <button className="btn-icon no-print" onClick={()=>setTappa(true)} title="Aggiungi tappa" style={{padding:"5px 8px",fontSize:12}}>＋ Tappa</button>
             <button className="btn-icon no-print" onClick={()=>setShowFillDays(true)} title="Riempi giorni" style={{padding:"5px 8px",fontSize:12}}>⚡</button>
+            <button className="btn-icon no-print" onClick={()=>setShowRientro(true)} title="Spese di rientro" style={{padding:"5px 8px",fontSize:12}}>🏁</button>
             <button className="btn-icon no-print" onClick={()=>exportCSV(viaggio,tab)} title="Esporta CSV" style={{padding:"5px 8px",fontSize:11}}>CSV</button>
             <button className="btn-icon no-print" onClick={()=>window.print()} title="Stampa" style={{padding:"5px 8px"}}>🖨</button>
             {onShare && <button className="btn-icon no-print" onClick={onShare} title="Condividi" style={{padding:"5px 8px"}}>👥</button>}
@@ -2527,6 +2551,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       {showTappa && <TappaModal viaggio={viaggio} strutture={strutture} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setTappa(false)} onSave={addTappa}/>}
       {editingTappa && <TappaModal viaggio={viaggio} strutture={strutture} initial={editingTappa} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
       {showFillDays && <FillDaysModal data={data} onApply={fillDays} onClose={()=>setShowFillDays(false)}/>}
+      {showRientro && <RientroModal viaggio={viaggio} tab={tab} onSave={updateTrip} onClose={()=>setShowRientro(false)}/>}
       {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" veicoli={veicoli} sottogruppiMap={{}}
         onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
         onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={gruppiEsistenti}/>}
@@ -4277,7 +4302,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.10 · Firebase · GitHub Pages
+        CamperHub v10.0 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4820,7 +4845,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.10</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.0</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
