@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v10.0</title>
+<title>🚐 CamperHub v10.1</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1422,7 +1422,7 @@ function DayModal({dayIndex, data, budget, onClose, onChange, consumoMedio, prez
 }
 
 // ── Tappa Chain ────────────────────────────────────────────────────────────
-function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit}){
+function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit, onRientro}){
   const totalAllocato = tappe.reduce((a,t)=>a+n(t.budgetAllocato),0);
   const nonAllocato   = budget - totalAllocato;
   // Ordina tappe per data check-in
@@ -1524,6 +1524,45 @@ function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit}
           );
         })}
       </div>
+
+      {/* Card Spese di rientro */}
+      {onRientro&&(()=>{
+        const lastDay = data[data.length-1];
+        const rSpeso = lastDay ? n(lastDay.gasolio)+n(lastDay.pedaggi)+n(lastDay.traghetto)+n(lastDay.cena)+n(lastDay.colazione) : 0;
+        const hasRientro = rSpeso > 0;
+        return(
+          <div style={{marginTop:4}}>
+            {hasRientro&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',padding:'2px 0'}}>
+              ↓ spese di rientro
+            </div>}
+            <div className="card-sm" style={{padding:0,overflow:'hidden',opacity:.9,
+              border:'1px dashed var(--primary-dim)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',cursor:'pointer'}}
+                onClick={onRientro}>
+                <span style={{fontSize:20}}>🏁</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--primary)'}}>Spese di rientro</div>
+                  <div style={{fontSize:11,color:'var(--text3)'}}>
+                    {lastDay?fmtDate(lastDay.date):'ultimo giorno'} · tocca per modificare
+                  </div>
+                </div>
+                {hasRientro&&<span style={{fontSize:13,fontWeight:700,color:'var(--accent)'}}>€{fmt2(rSpeso)}</span>}
+                {!hasRientro&&<span style={{fontSize:11,color:'var(--text3)'}}>+</span>}
+              </div>
+              {hasRientro&&(
+                <div style={{display:'flex',gap:10,padding:'0 14px 10px',flexWrap:'wrap'}}>
+                  {n(lastDay.gasolio)>0&&<span style={{fontSize:11,color:'var(--text3)'}}>⛽ €{lastDay.gasolio}</span>}
+                  {n(lastDay.pedaggi)>0&&<span style={{fontSize:11,color:'var(--text3)'}}>🛣️ €{lastDay.pedaggi}</span>}
+                  {n(lastDay.traghetto)>0&&<span style={{fontSize:11,color:'var(--text3)'}}>🚢 €{lastDay.traghetto}</span>}
+                  {n(lastDay.cena)>0&&<span style={{fontSize:11,color:'var(--text3)'}}>🍽️ €{lastDay.cena}</span>}
+                  {n(lastDay.colazione)>0&&<span style={{fontSize:11,color:'var(--text3)'}}>☕ €{lastDay.colazione}</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {totalAllocato > 0 && (
         <div className="budget-unallocated">
           <span style={{color:"var(--accent)",fontWeight:600}}>🎯 Buffer non allocato</span>
@@ -1758,26 +1797,10 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
         <div className="section-title" style={{marginBottom:10}}>🚢 Traghetto</div>
         <div className="form-grid" style={{gap:10}}>
           <div className="field" style={{gridColumn:'1/-1'}}>
-            <label className="field-label">Costo traghetto € (0 = nessuno)</label>
+            <label className="field-label">Costo traghetto € (0 = nessuno) — inserito nel giorno di check-in</label>
             <input type="number" className="field-input" value={f.costoTraghetto||""} placeholder="0"
               onFocus={e=>e.target.select()} onChange={e=>u("costoTraghetto",+e.target.value||0)}/>
           </div>
-          {n(f.costoTraghetto)>0&&(
-            <div className="field" style={{gridColumn:'1/-1'}}>
-              <label className="field-label">Inserisci nel giorno di</label>
-              <div style={{display:'flex',gap:8}}>
-                {[['partenza','🚀 Partenza (giorno prima del check-in)'],['arrivo','🏁 Arrivo (giorno check-in)']].map(([v,lbl])=>(
-                  <button key={v} onClick={()=>u("traghettoGiorno",v)}
-                    style={{flex:1,padding:'7px 4px',borderRadius:8,fontSize:11,fontWeight:600,cursor:'pointer',
-                      border:'1.5px solid '+(f.traghettoGiorno===v?'var(--primary)':'var(--border)'),
-                      background:f.traghettoGiorno===v?'var(--primary-faint)':'var(--card)',
-                      color:f.traghettoGiorno===v?'var(--primary)':'var(--text2)'}}>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -2324,10 +2347,9 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
     if(n(form.costoCarburante)>0)
       copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
-    if(n(form.costoTraghetto)>0){
-      const tragIdx = form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx;
-      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(copy[tab][tragIdx].traghetto) + n(form.costoTraghetto)};
-    }
+    // Traghetto → sempre sul giorno di check-in (appartiene alla tappa che arriva)
+    if(n(form.costoTraghetto)>0)
+      copy[tab][sIdx]={...copy[tab][sIdx], traghetto: n(copy[tab][sIdx].traghetto) + n(form.costoTraghetto)};
 
     copy.tappe.push({...form,id:Date.now(),target:tab,idTappa:idT});
     updateTrip(copy);
@@ -2417,10 +2439,8 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
     if(n(form.kmTappa)>0)        copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
     if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
-    if(n(form.costoTraghetto)>0){
-      const tragIdx = form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx;
-      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(copy[tab][tragIdx].traghetto) + n(form.costoTraghetto)};
-    }
+    if(n(form.costoTraghetto)>0)
+      copy[tab][sIdx]={...copy[tab][sIdx], traghetto: n(copy[tab][sIdx].traghetto) + n(form.costoTraghetto)};
     updateTrip(copy);
     setEditingTappa(null);
   };
@@ -2466,7 +2486,6 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
           <div style={{marginLeft:"auto",display:"flex",gap:5,flexShrink:0}}>
             <button className="btn-icon no-print" onClick={()=>setTappa(true)} title="Aggiungi tappa" style={{padding:"5px 8px",fontSize:12}}>＋ Tappa</button>
             <button className="btn-icon no-print" onClick={()=>setShowFillDays(true)} title="Riempi giorni" style={{padding:"5px 8px",fontSize:12}}>⚡</button>
-            <button className="btn-icon no-print" onClick={()=>setShowRientro(true)} title="Spese di rientro" style={{padding:"5px 8px",fontSize:12}}>🏁</button>
             <button className="btn-icon no-print" onClick={()=>exportCSV(viaggio,tab)} title="Esporta CSV" style={{padding:"5px 8px",fontSize:11}}>CSV</button>
             <button className="btn-icon no-print" onClick={()=>window.print()} title="Stampa" style={{padding:"5px 8px"}}>🖨</button>
             {onShare && <button className="btn-icon no-print" onClick={onShare} title="Condividi" style={{padding:"5px 8px"}}>👥</button>}
@@ -2484,6 +2503,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
             onDelete={t=>setDelTappa(t)}
             onUpdateBudget={updateTappaBudget}
             onEdit={t=>setEditingTappa(t)}
+            onRientro={()=>setShowRientro(true)}
           />
         )}
 
@@ -4302,7 +4322,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v10.0 · Firebase · GitHub Pages
+        CamperHub v10.1 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4845,7 +4865,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.0</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.1</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
