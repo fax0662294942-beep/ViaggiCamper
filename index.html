@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.4</title>
+<title>🚐 CamperHub v9.5</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1927,7 +1927,7 @@ function VeicoloPicker({veicoli, veicoloId, veicoloText, onSelect, onAddNew}){
 }
 
 // ── New / Edit Trip Modal ─────────────────────────────────────────────────
-function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti=[], veicoli=[], onAddVeicolo}){
+function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti=[], sottogruppiMap={}, veicoli=[], onAddVeicolo}){
   const today = new Date().toISOString().slice(0,10);
   const [f,setF] = React.useState(initial ? {
     nome: initial.nome||(isCopy?initial.nome+' (copia)':''),
@@ -1944,12 +1944,11 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
   const [nuovoGruppo, setNuovoGruppo] = React.useState(
     !!(initial?.gruppo && !gruppiEsistenti.includes(initial.gruppo))
   );
+  const [nuovoSottogruppo, setNuovoSG] = React.useState(false);
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const giorni = diffInclusive(f.startDate, f.endDate);
-  // Sottogruppi esistenti nel gruppo selezionato
-  const sottogruppiEsistenti = f.gruppo
-    ? [...new Set(gruppiEsistenti.filter(()=>true).flatMap(()=>[]))] // placeholder — viene calcolato da App
-    : [];
+  // Sottogruppi esistenti per il gruppo corrente
+  const sottogruppiEsistenti = f.gruppo ? (sottogruppiMap[f.gruppo] || []) : [];
   const save=()=>{
     if(!f.nome.trim()) return alert("Inserisci il nome del viaggio");
     if(giorni<1) return alert("Le date non sono valide");
@@ -1957,7 +1956,7 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
   };
   const onSelectGruppo = val => {
     if(val==='__nuovo__'){ setNuovoGruppo(true); u('gruppo',''); }
-    else { setNuovoGruppo(false); u('gruppo',val); }
+    else { setNuovoGruppo(false); u('gruppo',val); u('sottogruppo',''); setNuovoSG(false); }
   };
   return (
     <Modal title={title} onClose={onClose} width="460px">
@@ -2001,12 +2000,31 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
         {f.gruppo&&(
           <div className="field" style={{gridColumn:"1/-1"}}>
             <label className="field-label">📂 Sotto-gruppo (opzionale)</label>
-            <input type="text" className="field-input"
-              value={f.sottogruppo||''} onChange={e=>u('sottogruppo',e.target.value)}
-              placeholder="es. Prima settimana, Tappa Nord, Hotel..."/>
+            {!nuovoSottogruppo && sottogruppiEsistenti.length>0 ? (
+              <select className="field-input" value={f.sottogruppo||''}
+                onChange={e=>{
+                  if(e.target.value==='__nuovo__'){setNuovoSG(true);u('sottogruppo','');}
+                  else u('sottogruppo',e.target.value);
+                }}>
+                <option value="">— Nessun sotto-gruppo —</option>
+                {sottogruppiEsistenti.map(sg=><option key={sg} value={sg}>{sg}</option>)}
+                <option value="__nuovo__">➕ Crea nuovo...</option>
+              </select>
+            ) : (
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <input type="text" className="field-input" style={{flex:1}}
+                  autoFocus={nuovoSottogruppo}
+                  value={f.sottogruppo||''} onChange={e=>u('sottogruppo',e.target.value)}
+                  placeholder="es. Settimana 1, Tappa Nord..."/>
+                {sottogruppiEsistenti.length>0&&(
+                  <button className="btn" style={{flexShrink:0,padding:'8px 10px',fontSize:12}}
+                    onClick={()=>{setNuovoSG(false);u('sottogruppo','');}}>← Lista</button>
+                )}
+              </div>
+            )}
             {f.sottogruppo&&(
               <div style={{fontSize:10,color:'var(--text3)',marginTop:3}}>
-                Il viaggio apparirà sotto {f.gruppo} → {f.sottogruppo}
+                📁 {f.gruppo} › 📂 {f.sottogruppo}
               </div>
             )}
           </div>
@@ -2413,7 +2431,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       {showTappa && <TappaModal viaggio={viaggio} strutture={strutture} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setTappa(false)} onSave={addTappa}/>}
       {editingTappa && <TappaModal viaggio={viaggio} strutture={strutture} initial={editingTappa} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
       {showFillDays && <FillDaysModal data={data} onApply={fillDays} onClose={()=>setShowFillDays(false)}/>}
-      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" veicoli={veicoli}
+      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" veicoli={veicoli} sottogruppiMap={{}}
         onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
         onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={gruppiEsistenti}/>}
       {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
@@ -2584,6 +2602,134 @@ function ShareModal({viaggio, user, onClose}){
 }
 
 // ── Viaggi Section ───────────────────────────────────────────────────────
+// ── AssignSottogruppoModal ───────────────────────────────────────────────────
+function AssignSottogruppoModal({viaggi, gruppiEsistenti, sottogruppiMap, updateTrip, onClose}){
+  const [filterGruppo, setFilterGruppo] = React.useState(gruppiEsistenti[0]||'');
+  const [sgInput,  setSgInput]  = React.useState('');
+  const [useSgSel, setUseSgSel] = React.useState(false); // true = dropdown, false = testo
+  const [sel, setSel] = React.useState(new Set());
+
+  const sgEsistenti = sottogruppiMap[filterGruppo] || [];
+  const candidati = filterGruppo
+    ? viaggi.filter(v=>(v.gruppo||'').trim()===filterGruppo)
+    : viaggi;
+  const toggleV = id => setSel(s=>{ const ns=new Set(s); ns.has(id)?ns.delete(id):ns.add(id); return ns; });
+  const toggleAll = () => setSel(s=>s.size===candidati.length?new Set():new Set(candidati.map(v=>v.id)));
+
+  const apply = () => {
+    const sg = sgInput.trim();
+    if(!sg){ alert('Inserisci il nome del sotto-gruppo'); return; }
+    if(!sel.size){ alert('Seleziona almeno un viaggio'); return; }
+    candidati.filter(v=>sel.has(v.id)).forEach(v=>updateTrip({...v,sottogruppo:sg}));
+    onClose();
+  };
+
+  return(
+    <Modal title="📂 Assegna sotto-gruppo" onClose={onClose} width="480px">
+      {/* Filtro gruppo */}
+      {gruppiEsistenti.length>0&&(
+        <div className="field" style={{marginBottom:12}}>
+          <label className="field-label">📁 Filtra per gruppo</label>
+          <select className="field-input" value={filterGruppo}
+            onChange={e=>{setFilterGruppo(e.target.value);setSel(new Set());}}>
+            <option value="">— Tutti i viaggi —</option>
+            {gruppiEsistenti.map(g=><option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* Sotto-gruppo da assegnare */}
+      <div className="field" style={{marginBottom:12}}>
+        <label className="field-label">📂 Sotto-gruppo da assegnare</label>
+        {sgEsistenti.length>0&&useSgSel ? (
+          <div style={{display:'flex',gap:8}}>
+            <select className="field-input" style={{flex:1}} value={sgInput}
+              onChange={e=>{ if(e.target.value==='__nuovo__'){setUseSgSel(false);setSgInput('');}else setSgInput(e.target.value);}}>
+              <option value="">— Seleziona —</option>
+              {sgEsistenti.map(sg=><option key={sg} value={sg}>{sg}</option>)}
+              <option value="__nuovo__">➕ Nuovo...</option>
+            </select>
+          </div>
+        ) : (
+          <div style={{display:'flex',gap:8}}>
+            <input type="text" className="field-input" style={{flex:1}} autoFocus
+              value={sgInput} onChange={e=>setSgInput(e.target.value)}
+              placeholder="es. Settimana 1, Tappa Nord..."/>
+            {sgEsistenti.length>0&&<button className="btn" style={{flexShrink:0,fontSize:12,padding:'7px 10px'}}
+              onClick={()=>{setUseSgSel(true);setSgInput('');}}>← Esistenti</button>}
+          </div>
+        )}
+        {/* Chips sottogruppi esistenti come scorciatoia */}
+        {sgEsistenti.length>0&&!useSgSel&&(
+          <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:8}}>
+            {sgEsistenti.map(sg=>(
+              <button key={sg} onClick={()=>setSgInput(sg)}
+                style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',
+                  border:'1px solid '+(sgInput===sg?'var(--primary)':'var(--border)'),
+                  background:sgInput===sg?'var(--primary-faint)':'transparent',
+                  color:sgInput===sg?'var(--primary)':'var(--text2)'}}>
+                {sg}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Lista viaggi */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+        <div style={{fontSize:12,color:'var(--text2)'}}>
+          {candidati.length} viaggi · <strong>{sel.size}</strong> selezionati
+        </div>
+        <button className="btn" style={{fontSize:11,padding:'4px 10px'}} onClick={toggleAll}>
+          {sel.size===candidati.length?'Deseleziona tutti':'Seleziona tutti'}
+        </button>
+      </div>
+      <div style={{maxHeight:280,overflowY:'auto',border:'1px solid var(--border)',borderRadius:10,marginBottom:14}}>
+        {candidati.length===0&&<div style={{padding:'16px',fontSize:12,color:'var(--text3)',textAlign:'center'}}>Nessun viaggio in questo gruppo</div>}
+        {candidati.sort((a,b)=>a.startDate>b.startDate?1:-1).map((v,i)=>{
+          const isSel=sel.has(v.id);
+          const isConf=(v.status||'ipotesi')==='confermato';
+          return(
+            <div key={v.id} onClick={()=>toggleV(v.id)}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'9px 14px',cursor:'pointer',
+                borderBottom:i<candidati.length-1?'1px solid var(--border)':'none',
+                background:isSel?'rgba(79,216,180,.07)':'transparent'}}>
+              <div style={{width:20,height:20,borderRadius:4,flexShrink:0,
+                border:'2px solid '+(isSel?'var(--primary)':'var(--border)'),
+                background:isSel?'var(--primary)':'transparent',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                color:'var(--bg)',fontSize:12,fontWeight:700}}>
+                {isSel?'✓':''}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                  <span>{v.nome}</span>
+                  <span style={{fontSize:10,padding:'1px 6px',borderRadius:8,
+                    background:isConf?'rgba(82,214,138,.15)':'rgba(79,216,180,.1)',
+                    color:isConf?'var(--green)':'var(--primary)'}}>
+                    {isConf?'✅':'💭'}
+                  </span>
+                </div>
+                <div style={{fontSize:10,color:'var(--text3)'}}>
+                  {fmtDate(v.startDate)} → {fmtDate(v.endDate)}
+                  {v.sottogruppo&&<span style={{color:'var(--accent)',marginLeft:6}}>📂 {v.sottogruppo}</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="btn-row">
+        <button className="btn-primary" onClick={apply}>
+          ✓ Assegna "{sgInput||'...'}" a {sel.size} {sel.size===1?'viaggio':'viaggi'}
+        </button>
+        <button className="btn" onClick={onClose}>Annulla</button>
+      </div>
+    </Modal>
+  );
+}
+
 // ── GruppiManager ────────────────────────────────────────────────────────
 function GruppiManager({gruppi, viaggi, updateTrip, onClose}){
   const [editId, setEditId]   = React.useState(null);  // nome gruppo in editing
@@ -2668,6 +2814,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
   const [strSub,     setStrSub]     = React.useState('strutture'); // 'strutture'|'veicoli'
   const [strModal,   setStrModal]   = React.useState(null);
   const [veicoloModal, setVeicoloModal] = React.useState(null);
+  const [showAssignSG, setShowAssignSG] = React.useState(false);
 
   const toggleStatus = (v) => {
     const newStatus = (v.status||'ipotesi')==='ipotesi' ? 'confermato' : 'ipotesi';
@@ -2698,6 +2845,12 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
   const totIpotesi  = viaggi.filter(v=>(v.status||'ipotesi')==='ipotesi').length;
   const totConf     = viaggi.filter(v=>(v.status||'ipotesi')==='confermato').length;
   const gruppiEsistenti = [...new Set(viaggi.map(v=>(v.gruppo||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'));
+  // Mappa gruppo → [sottogruppi]
+  const sottogruppiMap = viaggi.reduce((acc,v)=>{
+    const g=(v.gruppo||'').trim(); const sg=(v.sottogruppo||'').trim();
+    if(g&&sg){ if(!acc[g])acc[g]=[]; if(!acc[g].includes(sg))acc[g].push(sg); }
+    return acc;
+  },{});
 
   return(
     <div>
@@ -2709,6 +2862,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
             {vsView==='strutture'?'🏕️ Strutture':'✈️ Viaggi'}
           </div>
           {vsView==='viaggi'&&<button className="btn" style={{padding:'5px 8px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁</button>}
+          {vsView==='viaggi'&&<button className="btn" style={{padding:'5px 8px',fontSize:11,flexShrink:0}} title="Assegna sotto-gruppo" onClick={()=>setShowAssignSG(true)}>📂</button>}
           {vsView==='viaggi'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>}
           {vsView==='strutture'&&strSub==='strutture'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',note:'',tariffe:[]}})}>＋ Struttura</button>}
           {vsView==='strutture'&&strSub==='veicoli'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setVeicoloModal({id:null,nome:'',icona:'🚐',consumoMedio:0,note:''})}>＋ Veicolo</button>}
@@ -2929,10 +3083,10 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         </div>
       </div>)}
 
-      {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} veicoli={veicoli}
+      {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} veicoli={veicoli}
         onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
         onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
-      {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti} veicoli={veicoli}
+      {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} veicoli={veicoli}
         onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
         initial={{...copyData, nome:copyData.nome+' (copia)', preventivo:undefined, consuntivo:undefined, tappe:[]}}
         onClose={()=>setCopyData(null)} onSave={f=>{addTrip(f);setCopyData(null);}}/>}
@@ -2940,6 +3094,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
       {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
       {showGruppi&&<GruppiManager gruppi={gruppiEsistenti} viaggi={viaggi} updateTrip={updateTrip} onClose={()=>setShowGruppi(false)}/>}
+      {showAssignSG&&<AssignSottogruppoModal viaggi={viaggi} gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} updateTrip={updateTrip} onClose={()=>setShowAssignSG(false)}/>}
 
       {/* Modal Veicolo */}
       {veicoloModal&&(
@@ -4024,7 +4179,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.4 · Firebase · GitHub Pages
+        CamperHub v9.5 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4567,7 +4722,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.4</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.5</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
