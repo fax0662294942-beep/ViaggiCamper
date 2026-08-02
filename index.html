@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.1</title>
+<title>🚐 CamperHub v9.2</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1571,6 +1571,7 @@ function StrutturaPicker({strutture, strutturaId, strutturaText, onSelect, onAdd
       <div style={{display:'flex',gap:6}}>
         <input type="text" className="field-input" style={{flex:1}}
           value={q} placeholder="Cerca per nome..."
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
           onChange={e=>{setQ(e.target.value);setOpen(true);}}
           onFocus={()=>setOpen(true)}/>
         {selSt&&<button className="btn" style={{flexShrink:0,fontSize:11,padding:'6px 8px',color:'var(--text3)'}}
@@ -1757,10 +1758,13 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
             {costoStimato>0 && (
               <div>
                 <span>Costo stimato</span>
-                <strong style={{color:"var(--accent)"}}>
-                  €{roundTo10(costoStimato)}
-                  <span style={{fontSize:10,fontWeight:400,color:'var(--text3)',marginLeft:4}}>({fmt2(costoStimato)})</span>
-                </strong>
+                <strong style={{color:"var(--accent)"}}>€{fmt2(costoStimato)}</strong>
+              </div>
+            )}
+            {costoStimato>0 && (
+              <div>
+                <span>→ Arrotondato</span>
+                <strong style={{color:"var(--green)"}}>€{roundTo10(costoStimato)}</strong>
               </div>
             )}
           </div>
@@ -1775,7 +1779,7 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
               onChange={e=>u("costoCarburante",+e.target.value||0)}
               style={{fontSize:16,fontWeight:700,color:"var(--primary)"}}/>
             <span style={{fontSize:11,color:"var(--text3)",marginTop:4,display:"block"}}>
-              Arrotondato: €{roundTo10(costoStimato)} · Esatto: €{fmt2(costoStimato)}
+              Il valore in tabella è già arrotondato al 10 più vicino
             </span>
           </div>
         )}
@@ -1814,6 +1818,7 @@ function VeicoloPicker({veicoli, veicoloId, veicoloText, onSelect, onAddNew}){
       <div style={{display:'flex',gap:6}}>
         <input type="text" className="field-input" style={{flex:1}}
           value={q} placeholder="Cerca o inserisci nome/targa..."
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
           onChange={e=>{setQ(e.target.value);setOpen(true);}}
           onFocus={()=>setOpen(true)}/>
         {selV&&<button className="btn" style={{flexShrink:0,fontSize:11,padding:'6px 8px',color:'var(--text3)'}}
@@ -3839,7 +3844,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.1 · Firebase · GitHub Pages
+        CamperHub v9.2 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4382,7 +4387,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.1</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.2</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
