@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.9</title>
+<title>🚐 CamperHub v9.10</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2283,7 +2283,12 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     const DAILY_FIELDS = ['startDate','endDate','luogo','struttura','costoPiazzola',
       'costoPersona','numeroPersone','elettricita','moto','tassaSoggiorno',
       'costoDoccia','extraStruttura','kmTappa','costoCarburante','costoTraghetto','traghettoGiorno'];
-    const dailyChanged = DAILY_FIELDS.some(k => String(form[k]??'') !== String(oldTappa[k]??''));
+    // Normalizza i valori default per evitare falsi positivi su campi non presenti in tapppe vecchie
+    const normF = (k,v) => {
+      if(v===undefined||v===null) { if(k==='traghettoGiorno') return 'partenza'; return ''; }
+      return String(v);
+    };
+    const dailyChanged = DAILY_FIELDS.some(k => normF(k,form[k]) !== normF(k,oldTappa[k]));
     if(!dailyChanged && !isTransit){
       const copy = {...viaggio,
         tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
@@ -2325,23 +2330,18 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     // Per transit: prima migra vecchi dati da sIdx-1 se necessario
     const fullCopy = [...viaggio[tab]];
     if(isTransit && sIdx > 0){
+      // Migrazione: svuota vecchia posizione (sIdx-1) senza spostare su sIdx.
+      // Il FULL RE-APPLY scriverà fresh su sIdx tramite il blocco fuel/traghetto sotto.
       const prevD = fullCopy[sIdx-1];
-      const curD  = fullCopy[sIdx];
       const oldKm  = n(oldTappa.kmTappa||0);
       const oldGas = n(oldTappa.costoCarburante||0);
       const oldTrag= n(oldTappa.costoTraghetto||0);
-      if(oldKm>0 && n(prevD.km)>=oldKm && n(curD.km)<oldKm){
-        fullCopy[sIdx-1]={...prevD, km:Math.max(0,n(prevD.km)-oldKm)};
-        fullCopy[sIdx]={...curD, km:n(curD.km)+oldKm};
-      }
-      if(oldGas>0 && n(prevD.gasolio)>=oldGas && n(curD.gasolio)<oldGas){
+      if(oldKm>0  && n(prevD.km)>=oldKm)
+        fullCopy[sIdx-1]={...fullCopy[sIdx-1], km:Math.max(0,n(fullCopy[sIdx-1].km)-oldKm)};
+      if(oldGas>0 && n(prevD.gasolio)>=oldGas)
         fullCopy[sIdx-1]={...fullCopy[sIdx-1], gasolio:Math.max(0,n(fullCopy[sIdx-1].gasolio)-oldGas)};
-        fullCopy[sIdx]={...fullCopy[sIdx], gasolio:n(fullCopy[sIdx].gasolio)+oldGas};
-      }
-      if(oldTrag>0 && n(prevD.traghetto)>=oldTrag && n(curD.traghetto)<oldTrag){
+      if(oldTrag>0 && n(prevD.traghetto)>=oldTrag)
         fullCopy[sIdx-1]={...fullCopy[sIdx-1], traghetto:Math.max(0,n(fullCopy[sIdx-1].traghetto)-oldTrag)};
-        fullCopy[sIdx]={...fullCopy[sIdx], traghetto:n(fullCopy[sIdx].traghetto)+oldTrag};
-      }
     }
     const copy = {...viaggio,[tab]:[...fullCopy].map(d=>{
       if(d.idTappa!==oldTappa.idTappa) return d;
@@ -2388,16 +2388,15 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
 
     const fuelIdx = isTransit ? sIdx : (sIdx > 0 ? sIdx - 1 : sIdx);
     if(n(form.kmTappa)>0){
-      const kmPrev = isTransit ? n(copy[tab][fuelIdx].km) : 0;
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: kmPrev + n(form.kmTappa)};
+      // FULL RE-APPLY: scrittura fresca (il giorno è stato resettato dal blocco clear sopra)
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
     }
     if(n(form.costoCarburante)>0){
-      const gasPrev = isTransit ? n(copy[tab][fuelIdx].gasolio) : 0;
-      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: gasPrev + n(form.costoCarburante)};
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
     }
     if(n(form.costoTraghetto)>0){
       const tragIdx = isTransit ? sIdx : (form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx);
-      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(copy[tab][tragIdx].traghetto) + n(form.costoTraghetto)};
+      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(form.costoTraghetto)};
     }
     updateTrip(copy);
     setEditingTappa(null);
@@ -4278,7 +4277,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.9 · Firebase · GitHub Pages
+        CamperHub v9.10 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4821,7 +4820,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.9</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.10</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
