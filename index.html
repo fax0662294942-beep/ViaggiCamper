@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.8</title>
+<title>🚐 CamperHub v8.9</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -13,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -488,7 +488,7 @@ const mkDispensaDoc = (uid, email) => ({
   categories:DISP_CATS_DEFAULT, products:mkDispProds(),
   spesaManuale:[], persone:DISP_PERS_DEFAULT,
   valigie:[], valigieProdotti:[],
-  tags:[], luoghi:[],
+  tags:[], luoghi:[], strutture:[],
 });
 const dsStatusLabel = s => s==='ok'?'✅ OK':s==='low'?'⚠️ Scarso':'❌ Mancante';
 const dsStatusClass = s => s==='ok'?'ds-ok':s==='low'?'ds-low':'ds-out';
@@ -530,7 +530,7 @@ const fmtH = h => { if(h==null||isNaN(h)) return ""; const s=h<0?"-":"",a=Math.a
 // ── Data ───────────────────────────────────────────────────────────────────
 const makeDay = date => ({
   date, idTappa:"", luogo:"", struttura:"",
-  piazzola:0, tassa:0, extraStruttura:0, pagamentoManual:"",
+  piazzola:0, tassa:0, extraStruttura:0, doccia:0, pagamentoManual:"",
   benzina:0, gasolio:0, pedaggi:0, km:0, velocita:0,
   spesa:0, cena:0, colazione:0, extraVar:0
 });
@@ -541,13 +541,13 @@ const buildDays = (s,e,old=[]) => {
     return prev ? {...makeDay(date),...prev} : makeDay(date);
   });
 };
-const createTrip = ({nome,budget,startDate,endDate,veicolo="",consumoMedio:cm=0,prezzoCarburante:pc=0,status='ipotesi',gruppo=''}) => {
+const createTrip = ({nome,budget,startDate,endDate,veicolo="",consumoMedio:cm=0,prezzoCarburante:pc=0,status='ipotesi',gruppo='',sottogruppo=''}) => {
   const days = buildDays(startDate,endDate,[]);
   return {
     id: Date.now()+(Math.random()*999|0), nome,
     budget:n(budget), startDate, endDate,
     veicolo, consumoMedio:n(cm), prezzoCarburante:n(pc),
-    status, gruppo,
+    status, gruppo, sottogruppo,
     preventivo: days, consuntivo: days.map(d=>({...d})),
     tappe:[]
   };
@@ -560,6 +560,7 @@ const ROWS = [
   {key:"struttura",      label:"Struttura",           type:"text",   group:"struttura"},
   {key:"piazzola",       label:"Piazzola €",          type:"num",    group:"struttura"},
   {key:"tassa",          label:"Tassa soggiorno €",   type:"num",    group:"struttura"},
+  {key:"doccia",         label:"Doccia €",            type:"num",    group:"struttura"},
   {key:"extraStruttura", label:"Extra struttura €",   type:"num",    group:"struttura"},
   {key:"pagamentoManual",label:"Pag. manuale € *",    type:"numopt", group:"struttura"},
   {key:"benzina",        label:"Benzina €",           type:"num",    group:"viaggio"},
@@ -589,9 +590,9 @@ const calcPagamento = (days,idx) => {
   }
   return base + n(d.pagamentoManual);
 };
-const calcCosto = d => ["piazzola","tassa","extraStruttura","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0);
+const calcCosto = d => ["piazzola","tassa","extraStruttura","doccia","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0);
 // extraStruttura pagata ogni giorno, piazzola+tassa al checkout tramite calcPagamento
-const calcCassa = (days,idx) => { const d=days[idx]; return calcPagamento(days,idx)+["extraStruttura","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0); };
+const calcCassa = (days,idx) => { const d=days[idx]; return calcPagamento(days,idx)+["extraStruttura","doccia","benzina","gasolio","pedaggi","spesa","cena","colazione","extraVar"].reduce((a,k)=>a+n(d[k]),0); };
 const calcBudgetSeries = (days,budget) => { let c=n(budget); return days.map((_,i)=>{c-=calcCassa(days,i);return c;}); };
 const calcTempoNum = d => n(d.velocita)>0 ? n(d.km)/n(d.velocita) : null;
 
@@ -602,7 +603,7 @@ const getStats = (data, budget) => {
     km:      data.reduce((a,d)=>a+n(d.km),0),
     guida:   data.reduce((a,d)=>a+(calcTempoNum(d)||0),0),
     notti:   data.filter(d=>d.idTappa||n(d.piazzola)>0).length,
-    struttura: data.reduce((a,d)=>a+n(d.piazzola)+n(d.tassa)+n(d.extraStruttura),0),
+    struttura: data.reduce((a,d)=>a+n(d.piazzola)+n(d.tassa)+n(d.extraStruttura)+n(d.doccia),0),
     carburante:data.reduce((a,d)=>a+n(d.benzina)+n(d.gasolio),0),
     pedaggi:   data.reduce((a,d)=>a+n(d.pedaggi),0),
     vitto:   data.reduce((a,d)=>a+n(d.spesa)+n(d.cena)+n(d.colazione),0),
@@ -1312,6 +1313,7 @@ const DAY_SECTIONS = [
       {key:"struttura",       label:"Struttura",             type:"text"},
       {key:"piazzola",        label:"Piazzola €",            type:"num"},
       {key:"tassa",           label:"Tassa soggiorno €",     type:"num"},
+      {key:"doccia",          label:"Doccia €",              type:"num"},
       {key:"extraStruttura",  label:"Extra struttura €",     type:"num"},
       {key:"pagamentoManual", label:"Pagamento manuale €",   type:"numopt", hint:"Lascia vuoto per calcolo auto al checkout"},
     ]
@@ -1510,8 +1512,74 @@ function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit}
   );
 }
 
+// ── StrutturaPicker ─────────────────────────────────────────────────────────
+function StrutturaPicker({strutture, strutturaId, strutturaText, onSelect, onAddNew}){
+  const [q,setQ]     = React.useState(strutturaText||'');
+  const [open,setOpen] = React.useState(false);
+  const refDiv = React.useRef(null);
+  // Chiudi cliccando fuori
+  React.useEffect(()=>{
+    const fn = e => { if(refDiv.current && !refDiv.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown',fn); return ()=>document.removeEventListener('mousedown',fn);
+  },[]);
+  const filtered = (strutture||[]).filter(s=>s.nome.toLowerCase().includes(q.toLowerCase()));
+  const selSt = (strutture||[]).find(s=>s.id===strutturaId);
+  return(
+    <div ref={refDiv} style={{position:'relative',gridColumn:'1/-1'}}>
+      <label className="field-label">Struttura</label>
+      <div style={{display:'flex',gap:6}}>
+        <input type="text" className="field-input" style={{flex:1}}
+          value={q} placeholder="Cerca per nome..."
+          onChange={e=>{setQ(e.target.value);setOpen(true);}}
+          onFocus={()=>setOpen(true)}/>
+        {selSt&&<button className="btn" style={{flexShrink:0,fontSize:11,padding:'6px 8px',color:'var(--text3)'}}
+          onClick={()=>{setQ('');onSelect(null);}}>✕</button>}
+      </div>
+      {selSt&&!open&&(
+        <div style={{marginTop:4,fontSize:11,color:'var(--primary)'}}>
+          ✅ {selSt.nome} · piazzola €{selSt.piazzola||0}/n · doccia €{selSt.doccia||0}/doccia
+        </div>
+      )}
+      {open&&(
+        <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200,
+          background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,
+          maxHeight:220,overflowY:'auto',boxShadow:'0 6px 20px rgba(0,0,0,.4)'}}>
+          {filtered.length===0?(
+            <div>
+              <div style={{padding:'10px 14px',fontSize:12,color:'var(--text3)'}}>Nessuna struttura trovata{q?` per "${q}"`:''}</div>
+              <button style={{width:'100%',padding:'10px 14px',textAlign:'left',fontSize:12,fontWeight:600,
+                background:'var(--primary-faint)',color:'var(--primary)',border:'none',cursor:'pointer'}}
+                onClick={()=>{setOpen(false);onAddNew(q);}}>
+                ➕ Aggiungi "{q}" come nuova struttura
+              </button>
+            </div>
+          ) : filtered.map(s=>(
+            <div key={s.id}
+              style={{padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid var(--border)',
+                background:s.id===strutturaId?'var(--primary-faint)':'transparent',
+                display:'flex',flexDirection:'column',gap:2}}
+              onClick={()=>{setQ(s.nome);setOpen(false);onSelect(s);}}>
+              <div style={{fontSize:13,fontWeight:600,color:s.id===strutturaId?'var(--primary)':'var(--text)'}}>{s.nome}</div>
+              <div style={{fontSize:10,color:'var(--text3)'}}>
+                Piazzola €{s.piazzola||0} · P.persona €{s.costoPersona||0} · Doccia €{s.doccia||0} · Sogg. €{s.soggiorno||0}/pers
+              </div>
+            </div>
+          ))}
+          {filtered.length>0&&q&&(
+            <button style={{width:'100%',padding:'8px 14px',textAlign:'left',fontSize:11,fontWeight:600,
+              color:'var(--primary)',background:'transparent',border:'none',borderTop:'1px solid var(--border)',cursor:'pointer'}}
+              onClick={()=>{setOpen(false);onAddNew(q);}}>
+              ➕ Aggiungi "{q}" come nuova struttura
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tappa Modal ────────────────────────────────────────────────────────────
-function TappaModal({viaggio, onClose, onSave, initial}){
+function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStruttura}){
   const consumoMedio = n(viaggio.consumoMedio);
   const isEdit = !!initial;
   const [f,setF] = React.useState(initial ? {
@@ -1519,12 +1587,14 @@ function TappaModal({viaggio, onClose, onSave, initial}){
     endDate:   initial.endDate,
     luogo:     initial.luogo||"",
     struttura: initial.struttura||"",
+    strutturaId: initial.strutturaId||null,
     costoPiazzola: initial.costoPiazzola||0,
     costoPersona:  initial.costoPersona||0,
     numeroPersone: initial.numeroPersone||2,
     elettricita:   initial.elettricita||0,
     moto:          initial.moto||0,
     tassaSoggiorno:initial.tassaSoggiorno||0,
+    costoDoccia:   initial.costoDoccia||0,
     extraStruttura:initial.extraStruttura||0,
     budgetAllocato:initial.budgetAllocato||0,
     kmTappa:       initial.kmTappa||0,
@@ -1532,18 +1602,35 @@ function TappaModal({viaggio, onClose, onSave, initial}){
     costoCarburante:initial.costoCarburante||0,
   } : {
     startDate:viaggio.startDate, endDate:addDays(viaggio.startDate,1),
-    luogo:"", struttura:"",
+    luogo:"", struttura:"", strutturaId:null,
     costoPiazzola:0, costoPersona:0, numeroPersone:2,
-    elettricita:0, moto:0, tassaSoggiorno:0, extraStruttura:0,
+    elettricita:0, moto:0, tassaSoggiorno:0, costoDoccia:0, extraStruttura:0,
     budgetAllocato:0, kmTappa:0, prezzoLitro:0, costoCarburante:0
   });
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const notti = Math.max(0, diffInclusive(f.startDate, f.endDate)-1);
   const perNotte = n(f.costoPiazzola)+n(f.costoPersona)*n(f.numeroPersone)+n(f.elettricita)+n(f.moto);
   const tassaN   = n(f.tassaSoggiorno)*n(f.numeroPersone);
-  const totale   = (perNotte+tassaN)*notti;
+  const docciaG  = n(f.costoDoccia); // già calcolato: doccia × nPers × 2
+  const totale   = (perNotte+tassaN+docciaG)*notti;
   const litriStimati = consumoMedio>0 && n(f.kmTappa)>0 ? n(f.kmTappa)*consumoMedio/100 : 0;
   const costoStimato = litriStimati>0 && n(f.prezzoLitro)>0 ? litriStimati*n(f.prezzoLitro) : 0;
+
+  const onSelectStruttura = s => {
+    if(!s){ u('strutturaId',null); return; }
+    const nPers = n(f.numeroPersone)||2;
+    const docNotte = n(s.doccia)*nPers*2;
+    setF(p=>({...p,
+      strutturaId:  s.id,
+      struttura:    s.nome,
+      costoPiazzola:n(s.piazzola),
+      costoPersona: n(s.costoPersona),
+      elettricita:  n(s.elettricita),
+      moto:         n(s.moto),
+      tassaSoggiorno:n(s.soggiorno),
+      costoDoccia:  docNotte,
+    }));
+  };
 
   // Auto-suggest costoCarburante when it changes
   const onPrezzoLitro = v => {
@@ -1576,16 +1663,21 @@ function TappaModal({viaggio, onClose, onSave, initial}){
           <label className="field-label">Luogo</label>
           <input type="text" className="field-input" value={f.luogo} onChange={e=>u("luogo",e.target.value)} placeholder="es. Roma"/>
         </div>
-        <div className="field">
-          <label className="field-label">Struttura</label>
-          <input type="text" className="field-input" value={f.struttura} onChange={e=>u("struttura",e.target.value)} placeholder="es. Camping Bella Vista"/>
-        </div>
+        <StrutturaPicker strutture={strutture} strutturaId={f.strutturaId} strutturaText={f.struttura}
+          onSelect={onSelectStruttura}
+          onAddNew={nome=>{if(onAddStruttura)onAddStruttura(nome,onSelectStruttura);}}/>
         <NumField label="Costo piazzola €/notte"       value={f.costoPiazzola}    onChange={v=>u("costoPiazzola",v)}/>
         <NumField label="Costo a persona €/notte"       value={f.costoPersona}     onChange={v=>u("costoPersona",v)}/>
-        <NumField label="Numero persone"                value={f.numeroPersone}    onChange={v=>u("numeroPersone",v)}/>
+        <NumField label="Numero persone"                value={f.numeroPersone}    onChange={v=>{
+          u("numeroPersone",v);
+          // Ricalcola doccia se viene da una struttura
+          const s=strutture.find(x=>x.id===f.strutturaId);
+          if(s&&s.doccia) u("costoDoccia",n(s.doccia)*v*2);
+        }}/>
         <NumField label="Elettricità €/notte"           value={f.elettricita}      onChange={v=>u("elettricita",v)}/>
         <NumField label="Moto €/notte"                  value={f.moto}             onChange={v=>u("moto",v)}/>
-        <NumField label="Tassa soggiorno €/persona/notte" value={f.tassaSoggiorno} onChange={v=>u("tassaSoggiorno",v)}/>
+        <NumField label="Tassa soggiorno €/pers/notte"  value={f.tassaSoggiorno}   onChange={v=>u("tassaSoggiorno",v)}/>
+        <NumField label="Doccia €/notte (auto: €doccia×pers×2)" value={f.costoDoccia} onChange={v=>u("costoDoccia",v)}/>
         <NumField label="Extra struttura €/notte"       value={f.extraStruttura}   onChange={v=>u("extraStruttura",v)}/>
         <NumField label="Budget allocato € (opzionale)" value={f.budgetAllocato}   onChange={v=>u("budgetAllocato",v)} placeholder="0 = non definito"/>
       </div>
@@ -1636,6 +1728,7 @@ function TappaModal({viaggio, onClose, onSave, initial}){
         <div><span>Notti</span><strong className="primary">{notti}</strong></div>
         <div><span>Piazzola/notte</span><strong>€ {fmt2(perNotte)}</strong></div>
         <div><span>Tassa/notte</span><strong>€ {fmt2(tassaN)}</strong></div>
+        {docciaG>0&&<div><span>Doccia/notte</span><strong style={{color:'var(--accent)'}}>€ {fmt2(docciaG)}</strong></div>}
         <div><span>Totale struttura</span><strong className="accent">€ {fmt2(totale)}</strong></div>
       </div>
       <div className="btn-row">
@@ -1658,13 +1751,17 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
     consumoMedio: initial.consumoMedio||0,
     status: initial.status||'ipotesi',
     gruppo: initial.gruppo||'',
-  } : {nome:'',budget:1000,startDate:today,endDate:addDays(today,6),veicolo:'',consumoMedio:0,status:'ipotesi',gruppo:''});
+    sottogruppo: initial.sottogruppo||'',
+  } : {nome:'',budget:1000,startDate:today,endDate:addDays(today,6),veicolo:'',consumoMedio:0,status:'ipotesi',gruppo:'',sottogruppo:''});
   const [nuovoGruppo, setNuovoGruppo] = React.useState(
-    // Se initial.gruppo esiste ma non è nella lista, parti già in modalità "nuovo"
     !!(initial?.gruppo && !gruppiEsistenti.includes(initial.gruppo))
   );
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
   const giorni = diffInclusive(f.startDate, f.endDate);
+  // Sottogruppi esistenti nel gruppo selezionato
+  const sottogruppiEsistenti = f.gruppo
+    ? [...new Set(gruppiEsistenti.filter(()=>true).flatMap(()=>[]))] // placeholder — viene calcolato da App
+    : [];
   const save=()=>{
     if(!f.nome.trim()) return alert("Inserisci il nome del viaggio");
     if(giorni<1) return alert("Le date non sono valide");
@@ -1712,6 +1809,20 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
             </div>
           )}
         </div>
+        {/* Sottogruppo — visibile se gruppo selezionato */}
+        {f.gruppo&&(
+          <div className="field" style={{gridColumn:"1/-1"}}>
+            <label className="field-label">📂 Sotto-gruppo (opzionale)</label>
+            <input type="text" className="field-input"
+              value={f.sottogruppo||''} onChange={e=>u('sottogruppo',e.target.value)}
+              placeholder="es. Prima settimana, Tappa Nord, Hotel..."/>
+            {f.sottogruppo&&(
+              <div style={{fontSize:10,color:'var(--text3)',marginTop:3}}>
+                Il viaggio apparirà sotto {f.gruppo} → {f.sottogruppo}
+              </div>
+            )}
+          </div>
+        )}
         <div className="field" style={{gridColumn:"1/-1"}}>
           <label className="field-label">Nome viaggio</label>
           <input type="text" className="field-input" value={f.nome} onChange={e=>u("nome",e.target.value)} placeholder="es. Puglia, Val Gardena, Toscana..."/>
@@ -1748,7 +1859,7 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
 }
 
 // ── Trip View ──────────────────────────────────────────────────────────────
-function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}){
+function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[], strutture=[], onUpdateStrutture}){
   useBack(back);
   const [tab, setTab]           = React.useState("preventivo");
   const [showTappa, setTappa]   = React.useState(false);
@@ -1779,8 +1890,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}
     const idT   = `T${idN}`;
     const piaz  = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
     const tassa = n(form.tassaSoggiorno)*n(form.numeroPersone);
-
-    // Se sIdx ha già una tappa precedente (giorno condiviso checkout/checkin),
+    const doccia = n(form.costoDoccia); // già per notte (doccia × nPers × 2) (giorno condiviso checkout/checkin),
     // salvo il suo pagamento checkout come campo separato prima di sovrascrivere
     const dayAtSIdx = copy[tab][sIdx];
     let pagamentoCheckoutPrev = 0;
@@ -1791,9 +1901,9 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}
     }
 
     for(let i=sIdx;i<eIdx;i++){
-      copy[tab][i]={...copy[tab][i],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
+      copy[tab][i]={...copy[tab][i],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,doccia,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
     }
-    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
+    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:idT,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
 
     // Ripristino il pagamento checkout della tappa precedente sul giorno condiviso
     if(pagamentoCheckoutPrev > 0){
@@ -1815,12 +1925,11 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}
     copy[tab] = copy[tab].map(d => {
       if(d.idTappa !== tappa.idTappa) return d;
       if(d.prevIdTappa){
-        // Giorno condiviso: ripristino il checkout della tappa precedente
         const prevT = (viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
         return {...d, idTappa:d.prevIdTappa, luogo:prevT?.luogo||"", struttura:prevT?.struttura||"",
-          piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+          piazzola:0, tassa:0, doccia:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
       }
-      return {...d, idTappa:"", luogo:"", struttura:"", piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+      return {...d, idTappa:"", luogo:"", struttura:"", piazzola:0, tassa:0, doccia:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
     });
     updateTrip(copy);
   };
@@ -1830,21 +1939,20 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}
     const sIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.startDate));
     const eIdx = viaggio[tab].findIndex(d=>norm(d.date)===norm(form.endDate));
     if(sIdx===-1||eIdx===-1||eIdx<=sIdx){ alert("Controlla le date della tappa"); return; }
-    // Clear old tappa days (restoring prev tappa checkouts if needed)
     const copy = {...viaggio,[tab]:[...viaggio[tab]].map(d=>{
       if(d.idTappa!==oldTappa.idTappa) return d;
       if(d.prevIdTappa){
         const prevT = (viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
         return {...d, idTappa:d.prevIdTappa, luogo:prevT?.luogo||"", struttura:prevT?.struttura||"",
-          piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+          piazzola:0, tassa:0, doccia:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
       }
-      return {...d, idTappa:"", luogo:"", struttura:"", piazzola:0, tassa:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
+      return {...d, idTappa:"", luogo:"", struttura:"", piazzola:0, tassa:0, doccia:0, extraStruttura:0, pagamentoCheckoutPrev:0, prevIdTappa:""};
     }), tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...t,...form,idTappa:oldTappa.idTappa}:t)};
 
-    const piaz  = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
-    const tassa = n(form.tassaSoggiorno)*n(form.numeroPersone);
+    const piaz   = n(form.costoPiazzola)+n(form.costoPersona)*n(form.numeroPersone)+n(form.elettricita)+n(form.moto);
+    const tassa  = n(form.tassaSoggiorno)*n(form.numeroPersone);
+    const doccia = n(form.costoDoccia);
 
-    // Check shared day
     const dayAtSIdx = copy[tab][sIdx];
     let pagamentoCheckoutPrev = 0, prevIdTappa = "";
     if(dayAtSIdx.idTappa && dayAtSIdx.idTappa !== oldTappa.idTappa){
@@ -1853,9 +1961,9 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}
     }
 
     for(let i=sIdx;i<eIdx;i++){
-      copy[tab][i]={...copy[tab][i],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
+      copy[tab][i]={...copy[tab][i],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,piazzola:piaz,tassa,doccia,extraStruttura:n(form.extraStruttura),pagamentoCheckoutPrev:0,prevIdTappa:""};
     }
-    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
+    copy[tab][eIdx]={...copy[tab][eIdx],idTappa:oldTappa.idTappa,luogo:form.luogo,struttura:form.struttura,piazzola:0,tassa:0,doccia:0,extraStruttura:0,pagamentoCheckoutPrev:0,prevIdTappa:""};
     if(pagamentoCheckoutPrev>0) copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
 
     const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
@@ -1879,6 +1987,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}
       prezzoCarburante:n(form.prezzoCarburante),
       status:form.status||viaggio.status||'ipotesi',
       gruppo:form.gruppo||'',
+      sottogruppo:form.sottogruppo||'',
       preventivo:newPreventivo,consuntivo:newConsuntivo});
   };
 
@@ -1985,8 +2094,8 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[]}
         )}
       </div>
 
-      {showTappa && <TappaModal viaggio={viaggio} onClose={()=>setTappa(false)} onSave={addTappa}/>}
-      {editingTappa && <TappaModal viaggio={viaggio} initial={editingTappa} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
+      {showTappa && <TappaModal viaggio={viaggio} strutture={strutture} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setTappa(false)} onSave={addTappa}/>}
+      {editingTappa && <TappaModal viaggio={viaggio} strutture={strutture} initial={editingTappa} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
       {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={gruppiEsistenti}/>}
       {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
       {fsGrid && <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} fullscreen={true} onToggleFS={()=>setFsGrid(false)} onDayClick={i=>setDayModal(i)}/>}
@@ -2228,13 +2337,16 @@ function GruppiManager({gruppi, viaggi, updateTrip, onClose}){
   );
 }
 
-function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip}){
+function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip, strutture=[], onUpdateStrutture}){
   useBack(onBack);
   const [statusFil, setStatusFil] = React.useState('all');
   const [expandedY,  setExpandedY]  = React.useState({});
   const [expandedG,  setExpandedG]  = React.useState({});
+  const [expandedSG, setExpandedSG] = React.useState({});
   const [copyData,   setCopyData]   = React.useState(null);
   const [showGruppi, setShowGruppi] = React.useState(false);
+  const [vsView,     setVsView]     = React.useState('viaggi'); // 'viaggi' | 'strutture'
+  const [strModal,   setStrModal]   = React.useState(null); // {data} per edit/nuovo struttura
 
   const toggleStatus = (v) => {
     const newStatus = (v.status||'ipotesi')==='ipotesi' ? 'confermato' : 'ipotesi';
@@ -2255,10 +2367,12 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
     byYear[year][grp].push(v);
   });
   const years = Object.keys(byYear).sort((a,b)=>b-a);
-  const isExpY = y   => expandedY[y]!==false;           // anni: default espanso
-  const isExpG = key => expandedG[key]===true;           // gruppi: default collasso
+  const isExpY = y   => expandedY[y]!==false;
+  const isExpG = key => expandedG[key]===true;
+  const isExpSG= key => expandedSG[key]!==false; // sottogruppo: default espanso
   const togY   = y   => setExpandedY(p=>({...p,[y]:!isExpY(y)}));
   const togG   = key => setExpandedG(p=>({...p,[key]:!isExpG(key)}));
+  const togSG  = key => setExpandedSG(p=>({...p,[key]:!isExpSG(key)}));
 
   const totIpotesi  = viaggi.filter(v=>(v.status||'ipotesi')==='ipotesi').length;
   const totConf     = viaggi.filter(v=>(v.status||'ipotesi')==='confermato').length;
@@ -2271,122 +2385,192 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         <div style={{display:'flex',alignItems:'center',gap:8,width:'100%'}}>
           <button className="btn-icon" onClick={onBack} style={{flexShrink:0}}>←</button>
           <div className="logo" style={{fontSize:15,flex:1}}>✈️ <strong>I miei viaggi</strong></div>
-          <button className="btn" style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁 Gruppi</button>
-          <button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>
+          {vsView==='viaggi'&&<button className="btn" style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁 Gruppi</button>}
+          {vsView==='viaggi'&&<button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>}
+          {vsView==='strutture'&&<button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''}})}>＋ Struttura</button>}
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16,flexShrink:0}}>🚪</button>
+        </div>
+        {/* Tab switcher */}
+        <div style={{display:'flex',gap:0,borderRadius:10,overflow:'hidden',border:'1px solid var(--border)',margin:'10px 0 2px'}}>
+          {[['viaggi','✈️ Viaggi'],['strutture','🏕️ Strutture']].map(([k,lbl])=>(
+            <button key={k} onClick={()=>setVsView(k)}
+              style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',
+                background:vsView===k?'var(--primary)':'var(--card)',
+                color:vsView===k?'var(--bg)':'var(--text2)',transition:'background .15s'}}>
+              {lbl}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Filtri */}
-      <div style={{display:'flex',gap:5,padding:'10px 16px',borderBottom:'1px solid var(--border)',background:'var(--card)',overflowX:'auto'}}>
-        {[['all',`Tutti (${viaggi.length})`],['ipotesi',`💭 Ipotesi (${totIpotesi})`],['confermato',`✅ Confermati (${totConf})`]].map(([f,l])=>(
-          <button key={f} className={`btn-tab${statusFil===f?' active':''}`}
-            style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setStatusFil(f)}>{l}</button>
-        ))}
-      </div>
-
-      <div className="container">
-        {filtered.length===0&&(
-          <div className="empty" style={{paddingTop:50}}>
-            <div className="empty-icon">🚐</div>
-            <p style={{color:'var(--text2)'}}>Nessun viaggio trovato</p>
-            <button className="btn-primary" style={{marginTop:16}} onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
-          </div>
-        )}
-
-        {years.map(year=>{
-          const expY = isExpY(year);
-          const totInYear = Object.values(byYear[year]).flat().length;
-          const confInYear = Object.values(byYear[year]).flat().filter(v=>(v.status||'ipotesi')==='confermato').length;
-          return(
-            <div key={year} style={{marginBottom:20}}>
-              {/* Anno header */}
-              <div onClick={()=>togY(year)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',cursor:'pointer',borderBottom:'2px solid var(--primary-dim)',marginBottom:expY?12:0}}>
-                <span style={{fontSize:22,fontFamily:"'Syne',sans-serif",fontWeight:800,color:'var(--primary)'}}>{year}</span>
-                <span style={{fontSize:11,color:'var(--text3)',flex:1}}>
-                  {totInYear} {totInYear===1?'viaggio':'viaggi'} · {confInYear} confermati
-                </span>
-                <span style={{color:'var(--text3)',fontSize:13}}>{expY?'▲':'▼'}</span>
+      {/* ── VISTA STRUTTURE ── */}
+      {vsView==='strutture'&&(
+        <div className="container">
+          {strutture.length===0&&(
+            <div className="empty" style={{paddingTop:40}}>
+              <div className="empty-icon">🏕️</div>
+              <p>Nessuna struttura censita.<br/>Aggiungile con il bottone ＋</p>
+            </div>
+          )}
+          {strutture.map(s=>(
+            <div key={s.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{s.nome}</div>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:11,color:'var(--text3)'}}>
+                    {s.piazzola>0&&<span>🏕️ Piazzola: €{s.piazzola}/n</span>}
+                    {s.costoPersona>0&&<span>👤 Persona: €{s.costoPersona}/n</span>}
+                    {s.elettricita>0&&<span>⚡ Elett.: €{s.elettricita}/n</span>}
+                    {s.moto>0&&<span>🛵 Moto: €{s.moto}/n</span>}
+                    {s.soggiorno>0&&<span>🏛️ Sogg.: €{s.soggiorno}/pers/n</span>}
+                    {s.doccia>0&&<span style={{color:'var(--primary)'}}>🚿 Doccia: €{s.doccia}/doccia</span>}
+                  </div>
+                  {s.note&&<div style={{fontSize:11,color:'var(--text2)',marginTop:4}}>{s.note}</div>}
+                </div>
+                <button className="btn-icon btn-sm" onClick={()=>setStrModal({data:{...s}})}>✏️</button>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-              {expY && Object.entries(byYear[year]).sort(([a],[b])=>a.localeCompare(b,'it')).map(([grp,trips])=>{
-                const gkey = year+'_'+grp;
-                const expG = isExpG(gkey);
-                const confInGrp = trips.filter(v=>(v.status||'ipotesi')==='confermato').length;
-                const ipotInGrp = trips.filter(v=>(v.status||'ipotesi')==='ipotesi').length;
-                return(
-                  <div key={grp} style={{marginBottom:10,background:'var(--card)',borderRadius:14,border:'1px solid var(--border2)',overflow:'hidden'}}>
-                    {/* Gruppo header — collassabile */}
-                    <div onClick={()=>togG(gkey)}
-                      style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',cursor:'pointer',
-                        background:expG?'var(--card2)':'var(--card)'}}>
-                      <span style={{fontSize:18,flexShrink:0}}>📁</span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{grp}</div>
-                        <div style={{fontSize:11,color:'var(--text3)',marginTop:2,display:'flex',gap:8}}>
-                          <span>{trips.length} {trips.length===1?'viaggio':'viaggi'}</span>
-                          {confInGrp>0&&<span style={{color:'var(--green)'}}>✅ {confInGrp} confermati</span>}
-                          {ipotInGrp>0&&<span style={{color:'var(--primary)'}}>💭 {ipotInGrp} ipotesi</span>}
+      {/* ── VISTA VIAGGI ── */}
+      {vsView==='viaggi'&&(<>
+        {/* Filtri */}
+        <div style={{display:'flex',gap:5,padding:'10px 16px',borderBottom:'1px solid var(--border)',background:'var(--card)',overflowX:'auto'}}>
+          {[['all',`Tutti (${viaggi.length})`],['ipotesi',`💭 Ipotesi (${totIpotesi})`],['confermato',`✅ Confermati (${totConf})`]].map(([f,l])=>(
+            <button key={f} className={`btn-tab${statusFil===f?' active':''}`}
+              style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setStatusFil(f)}>{l}</button>
+          ))}
+        </div>
+
+        <div className="container">
+          {filtered.length===0&&(
+            <div className="empty" style={{paddingTop:50}}>
+              <div className="empty-icon">🚐</div>
+              <p style={{color:'var(--text2)'}}>Nessun viaggio trovato</p>
+              <button className="btn-primary" style={{marginTop:16}} onClick={()=>setNew(true)}>＋ Nuovo viaggio</button>
+            </div>
+          )}
+
+          {years.map(year=>{
+            const expY = isExpY(year);
+            const totInYear = Object.values(byYear[year]).flat().length;
+            const confInYear = Object.values(byYear[year]).flat().filter(v=>(v.status||'ipotesi')==='confermato').length;
+            return(
+              <div key={year} style={{marginBottom:20}}>
+                <div onClick={()=>togY(year)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',cursor:'pointer',borderBottom:'2px solid var(--primary-dim)',marginBottom:expY?12:0}}>
+                  <span style={{fontSize:22,fontFamily:"'Syne',sans-serif",fontWeight:800,color:'var(--primary)'}}>{year}</span>
+                  <span style={{fontSize:11,color:'var(--text3)',flex:1}}>
+                    {totInYear} {totInYear===1?'viaggio':'viaggi'} · {confInYear} confermati
+                  </span>
+                  <span style={{color:'var(--text3)',fontSize:13}}>{expY?'▲':'▼'}</span>
+                </div>
+
+                {expY && Object.entries(byYear[year]).sort(([a],[b])=>a.localeCompare(b,'it')).map(([grp,trips])=>{
+                  const gkey = year+'_'+grp;
+                  const expG = isExpG(gkey);
+                  const confInGrp = trips.filter(v=>(v.status||'ipotesi')==='confermato').length;
+                  const ipotInGrp = trips.filter(v=>(v.status||'ipotesi')==='ipotesi').length;
+                  // Controlla se ci sono sottogruppi
+                  const hasSG = trips.some(v=>(v.sottogruppo||'').trim());
+                  const bySG = {};
+                  if(hasSG){
+                    trips.forEach(v=>{
+                      const sg=(v.sottogruppo||'').trim()||'__none__';
+                      if(!bySG[sg])bySG[sg]=[];
+                      bySG[sg].push(v);
+                    });
+                  }
+                  const renderTripRow = (v,idx,arr) => {
+                    const isConf=(v.status||'ipotesi')==='confermato';
+                    const giorni=diffInclusive(v.startDate,v.endDate);
+                    const stats=getStats(v.consuntivo||[],v.budget);
+                    const hasData=(v.consuntivo||[]).some(d=>calcCosto(d)>0);
+                    return(
+                      <div key={v.id} style={{padding:'10px 14px',cursor:'pointer',
+                        borderBottom:idx<arr.length-1?'1px solid var(--border)':'none',
+                        background:'var(--bg2)'}} onClick={()=>onOpen(v.id)}>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}}>
+                              <span style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{v.nome}</span>
+                              <span onClick={e=>{e.stopPropagation();toggleStatus(v);}}
+                                title="Tocca per cambiare stato"
+                                style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:10,cursor:'pointer',
+                                  background:isConf?'rgba(82,214,138,.15)':'rgba(79,216,180,.08)',
+                                  color:isConf?'var(--green)':'var(--primary)',
+                                  border:'1px solid '+(isConf?'var(--green)':'var(--primary)')}}>
+                                {isConf?'✅ Confermato':'💭 Ipotesi'}
+                              </span>
+                            </div>
+                            <div style={{fontSize:11,color:'var(--text3)'}}>
+                              {fmtDate(v.startDate)} → {fmtDate(v.endDate)} · {giorni}g · €{fmt2(n(v.budget))}
+                              {hasData&&<span style={{color:stats.residuo>=0?'var(--green)':'var(--red)',marginLeft:6}}>
+                                res. €{fmt2(stats.residuo)}
+                              </span>}
+                            </div>
+                          </div>
+                          <div style={{display:'flex',gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                            <button className="btn-icon btn-sm" title="Copia" onClick={()=>setCopyData(v)} style={{fontSize:13,padding:'4px 5px'}}>📋</button>
+                            <button className="btn-icon btn-sm" style={{color:'var(--primary)',padding:'4px 5px'}} onClick={()=>setShare(v)} title="Condividi">👥</button>
+                            {v.ownerId===user.uid&&<button className="btn-icon btn-sm" style={{color:'var(--red)',padding:'4px 5px'}} onClick={()=>setDel(v.id)}>🗑</button>}
+                          </div>
                         </div>
                       </div>
-                      <span style={{color:'var(--text3)',fontSize:13,flexShrink:0}}>{expG?'▲':'▼'}</span>
-                    </div>
+                    );
+                  };
 
-                    {/* Trip rows dentro il gruppo */}
-                    {expG && (
-                      <div style={{borderTop:'1px solid var(--border)'}}>
-                        {trips.sort((a,b)=>a.startDate>b.startDate?1:-1).map((v,idx)=>{
-                          const isConf = (v.status||'ipotesi')==='confermato';
-                          const giorni = diffInclusive(v.startDate,v.endDate);
-                          const stats  = getStats(v.consuntivo||[], v.budget);
-                          const hasData= (v.consuntivo||[]).some(d=>calcCosto(d)>0);
-                          return(
-                            <div key={v.id} style={{padding:'10px 14px',cursor:'pointer',
-                              borderBottom:idx<trips.length-1?'1px solid var(--border)':'none',
-                              background:'var(--bg2)'}}
-                              onClick={()=>onOpen(v.id)}>
-                              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                <div style={{flex:1,minWidth:0}}>
-                                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}}>
-                                    <span style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{v.nome}</span>
-                                    <span onClick={e=>{e.stopPropagation();toggleStatus(v);}}
-                                      title="Tocca per cambiare stato"
-                                      style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:10,cursor:'pointer',
-                                        background:isConf?'rgba(82,214,138,.15)':'rgba(79,216,180,.08)',
-                                        color:isConf?'var(--green)':'var(--primary)',
-                                        border:'1px solid '+(isConf?'var(--green)':'var(--primary)')}}>
-                                      {isConf?'✅ Confermato':'💭 Ipotesi'}
-                                    </span>
-                                  </div>
-                                  <div style={{fontSize:11,color:'var(--text3)'}}>
-                                    {fmtDate(v.startDate)} → {fmtDate(v.endDate)} · {giorni}g · €{fmt2(n(v.budget))}
-                                    {hasData&&<span style={{color:stats.residuo>=0?'var(--green)':'var(--red)',marginLeft:6}}>
-                                      res. €{fmt2(stats.residuo)}
-                                    </span>}
-                                  </div>
-                                </div>
-                                <div style={{display:'flex',gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-                                  <button className="btn-icon btn-sm" title="Copia"
-                                    onClick={()=>setCopyData(v)} style={{fontSize:13,padding:'4px 5px'}}>📋</button>
-                                  <button className="btn-icon btn-sm" style={{color:'var(--primary)',padding:'4px 5px'}}
-                                    onClick={()=>setShare(v)} title="Condividi">👥</button>
-                                  {v.ownerId===user.uid&&
-                                    <button className="btn-icon btn-sm" style={{color:'var(--red)',padding:'4px 5px'}}
-                                      onClick={()=>setDel(v.id)}>🗑</button>}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                  return(
+                    <div key={grp} style={{marginBottom:10,background:'var(--card)',borderRadius:14,border:'1px solid var(--border2)',overflow:'hidden'}}>
+                      <div onClick={()=>togG(gkey)}
+                        style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',cursor:'pointer',
+                          background:expG?'var(--card2)':'var(--card)'}}>
+                        <span style={{fontSize:18,flexShrink:0}}>📁</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{grp}</div>
+                          <div style={{fontSize:11,color:'var(--text3)',marginTop:2,display:'flex',gap:8}}>
+                            <span>{trips.length} {trips.length===1?'viaggio':'viaggi'}</span>
+                            {confInGrp>0&&<span style={{color:'var(--green)'}}>✅ {confInGrp}</span>}
+                            {ipotInGrp>0&&<span style={{color:'var(--primary)'}}>💭 {ipotInGrp}</span>}
+                          </div>
+                        </div>
+                        <span style={{color:'var(--text3)',fontSize:13,flexShrink:0}}>{expG?'▲':'▼'}</span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
+
+                      {expG&&(
+                        <div style={{borderTop:'1px solid var(--border)'}}>
+                          {!hasSG && trips.sort((a,b)=>a.startDate>b.startDate?1:-1).map((v,idx,arr)=>renderTripRow(v,idx,arr))}
+                          {hasSG && Object.entries(bySG).sort(([a],[b])=>{if(a==='__none__')return 1;if(b==='__none__')return -1;return a.localeCompare(b,'it');}).map(([sg,sgTrips])=>{
+                            const sgKey=gkey+'_'+sg;
+                            const isNone=sg==='__none__';
+                            const expSG=isExpSG(sgKey);
+                            return(
+                              <div key={sg} style={{borderBottom:'1px solid var(--border)'}}>
+                                {!isNone&&(
+                                  <div onClick={()=>togSG(sgKey)}
+                                    style={{display:'flex',alignItems:'center',gap:8,padding:'9px 16px',cursor:'pointer',
+                                      background:expSG?'rgba(79,216,180,.05)':'transparent'}}>
+                                    <span style={{fontSize:14}}>📂</span>
+                                    <div style={{flex:1,fontSize:13,fontWeight:600,color:'var(--text2)'}}>{sg}</div>
+                                    <span style={{fontSize:11,color:'var(--text3)'}}>{sgTrips.length} viaggi</span>
+                                    <span style={{color:'var(--text3)',fontSize:11}}>{expSG?'▲':'▼'}</span>
+                                  </div>
+                                )}
+                                {(isNone||expSG)&&sgTrips.sort((a,b)=>a.startDate>b.startDate?1:-1).map((v,idx,arr)=>renderTripRow(v,idx,arr))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </>)}
 
       {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
       {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti}
@@ -2396,6 +2580,52 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
       {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
       {showGruppi&&<GruppiManager gruppi={gruppiEsistenti} viaggi={viaggi} updateTrip={updateTrip} onClose={()=>setShowGruppi(false)}/>}
+
+      {/* Modal Struttura */}
+      {strModal&&(
+        <Modal title={strModal.data.id?'Modifica Struttura':'Nuova Struttura'} onClose={()=>setStrModal(null)} width="480px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome *</label>
+              <input className="field-input" value={strModal.data.nome||''} onChange={e=>setStrModal(m=>({...m,data:{...m.data,nome:e.target.value}}))} placeholder="es. Camping Bella Vista, Agriturismo Rossi..."/>
+            </div>
+            {[['piazzola','🏕️ Piazzola €/notte'],['costoPersona','👤 Costo persona €/notte'],['elettricita','⚡ Elettricità €/notte'],['moto','🛵 Moto €/notte'],['soggiorno','🏛️ Tassa soggiorno €/pers/notte'],['doccia','🚿 Doccia €/doccia']].map(([k,lbl])=>(
+              <div key={k} className="field">
+                <label className="field-label">{lbl}</label>
+                <input type="number" className="field-input" value={strModal.data[k]||''} placeholder="0"
+                  onFocus={e=>e.target.select()}
+                  onChange={e=>setStrModal(m=>({...m,data:{...m.data,[k]:+e.target.value||0}}))}/>
+              </div>
+            ))}
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Note</label>
+              <input className="field-input" value={strModal.data.note||''} onChange={e=>setStrModal(m=>({...m,data:{...m.data,note:e.target.value}}))} placeholder="Note opzionali"/>
+            </div>
+            {strModal.data.doccia>0&&(
+              <div style={{gridColumn:'1/-1',background:'var(--primary-faint)',borderRadius:8,padding:'8px 12px',fontSize:11,color:'var(--primary)'}}>
+                🚿 Con 2 persone: €{(strModal.data.doccia*2*2).toFixed(2)}/notte · Con 3 persone: €{(strModal.data.doccia*3*2).toFixed(2)}/notte
+              </div>
+            )}
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{
+              if(!strModal.data.nome?.trim()){alert('Inserisci il nome');return;}
+              const s=strModal.data;
+              const newList=s.id&&strutture.find(x=>x.id===s.id)
+                ?strutture.map(x=>x.id===s.id?s:x)
+                :[...strutture,{...s,id:'st_'+Date.now()}];
+              if(onUpdateStrutture)onUpdateStrutture(newList);
+              setStrModal(null);
+            }}>✓ Salva</button>
+            {strModal.data.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>{
+              if(!confirm('Eliminare struttura?'))return;
+              if(onUpdateStrutture)onUpdateStrutture(strutture.filter(x=>x.id!==strModal.data.id));
+              setStrModal(null);
+            }}>🗑️</button>}
+            <button className="btn" onClick={()=>setStrModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -2493,7 +2723,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   });
 
   const [tab,setTab]           = React.useState('inventario');
-  const [invVista,setInvVista] = React.useState('categorie'); // 'categorie' | 'luoghi'
+  const [invVista,setInvVista] = React.useState('categorie');
   const [luogoOpenMap,setLuogoOpenMap] = React.useState({});
   const [selCat,setSelCat]     = React.useState('all');
   const [invFil,setInvFil]     = React.useState('all');
@@ -2579,17 +2809,8 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
     upd({luoghi:updated}); setModal(null);
   };
   const deleteLuogo = id => {
-    upd({
-      luoghi: luoghi.filter(l=>l.id!==id),
-      products: prods.map(p=>p.luogoId===id?{...p,luogoId:null}:p),
-    });
+    upd({luoghi:luoghi.filter(l=>l.id!==id), products:prods.map(p=>p.luogoId===id?{...p,luogoId:null}:p)});
     setModal(null);
-  };
-  const getLuogoStats = lid => {
-    const items = lid===null
-      ? prods.filter(p=>!p.disabled&&!p.luogoId)
-      : prods.filter(p=>!p.disabled&&p.luogoId===lid);
-    return {tot:items.length, bad:items.filter(p=>p.status==='low'||p.status==='out').length};
   };
 
   // Calcolo diretto senza useMemo per evitare problemi di dipendenze
@@ -2614,21 +2835,18 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   // Mini badge tag per le righe prodotto
 
   const TabInventario = () => {
-    // Vista Luoghi: accordion per luogo
     const renderVistaLuoghi = () => {
       const prodsAttivi = prods.filter(p=>!p.disabled);
-      // Luoghi censiti + slot "Senza luogo"
       const slots = [
-        ...luoghi.map(l=>({id:l.id, nome:l.nome, icona:l.icona||'📍', items:prodsAttivi.filter(p=>p.luogoId===l.id)})),
-        {id:null, nome:'Senza luogo', icona:'❓', items:prodsAttivi.filter(p=>!p.luogoId)},
+        ...luoghi.map(l=>({id:l.id,nome:l.nome,icona:l.icona||'📍',items:prodsAttivi.filter(p=>p.luogoId===l.id)})),
+        {id:null,nome:'Senza luogo',icona:'❓',items:prodsAttivi.filter(p=>!p.luogoId)},
       ].filter(s=>s.id!==null||s.items.length>0);
-
       return(
         <div>
-          {slots.length===0&&<div className="empty"><div className="empty-icon">📍</div><p>Nessun luogo configurato.<br/>Aggiungili dalle impostazioni.</p></div>}
+          {slots.length===0&&<div className="empty"><div className="empty-icon">📍</div><p>Nessun luogo configurato.<br/>Aggiungili dalle Impostazioni.</p></div>}
           {slots.map(slot=>{
-            const isOpen = luogoOpenMap[slot.id||'null']!==false; // default aperto
-            const bad = slot.items.filter(p=>p.status==='low'||p.status==='out').length;
+            const isOpen=luogoOpenMap[slot.id||'null']!==false;
+            const bad=slot.items.filter(p=>p.status==='low'||p.status==='out').length;
             return(
               <div key={slot.id||'null'} className="card-sm" style={{marginBottom:10,padding:0,overflow:'hidden'}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',
@@ -2637,9 +2855,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                   <span style={{fontSize:20}}>{slot.icona}</span>
                   <div style={{flex:1}}>
                     <div style={{fontSize:13,fontWeight:600}}>{slot.nome}</div>
-                    <div style={{fontSize:11,color:bad>0?'var(--red)':'var(--text3)'}}>
-                      {slot.items.length} prodotti{bad>0?` · ${bad} da controllare`:''}
-                    </div>
+                    <div style={{fontSize:11,color:bad>0?'var(--red)':'var(--text3)'}}>{slot.items.length} prodotti{bad>0?` · ${bad} da controllare`:''}</div>
                   </div>
                   {slot.id&&<button className="btn-icon btn-sm" style={{color:'var(--text3)'}}
                     onClick={e=>{e.stopPropagation();setModal({type:'luogo',data:{...luoghi.find(l=>l.id===slot.id)}});}}>✏️</button>}
@@ -2660,8 +2876,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
                                 <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
                               </div>
                               <button className={`ds-status ${dsStatusClass(p.status||'ok')}`}
-                                style={{fontSize:10,padding:'2px 7px'}}
-                                onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
+                                style={{fontSize:10,padding:'2px 7px'}} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
                                 {dsStatusLabel(p.status||'ok')}
                               </button>
                               <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
@@ -2705,17 +2920,15 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
           ))}
         </div>
 
-        {/* Vista Luoghi */}
         {invVista==='luoghi' && renderVistaLuoghi()}
 
-        {/* Vista Categorie (invariata) */}
         {invVista==='categorie' && (<>
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:12}}>
             {[{id:'all',name:'Tutti',icon:'📋',color:'#4fd8b4'},...cats].map(c=>{
-              const tot = c.id==='all' ? prods.filter(p=>!p.disabled).length : prods.filter(p=>p.cat===c.id&&!p.disabled).length;
-              const bad = c.id==='all' ? 0 : prods.filter(p=>p.cat===c.id&&!p.disabled&&(p.status==='low'||p.status==='out')).length;
-              const isSel = selCat===c.id;
-              return (
+              const tot=c.id==='all'?prods.filter(p=>!p.disabled).length:prods.filter(p=>p.cat===c.id&&!p.disabled).length;
+              const bad=c.id==='all'?0:prods.filter(p=>p.cat===c.id&&!p.disabled&&(p.status==='low'||p.status==='out')).length;
+              const isSel=selCat===c.id;
+              return(
                 <div key={c.id} onClick={()=>{setSelCat(c.id);setInvFil('all');}}
                   style={{background:isSel?`rgba(${hexRgb(c.color)},.18)`:'var(--card)',border:'1.5px solid '+(isSel?c.color:'var(--border)'),borderRadius:12,padding:'10px 4px',textAlign:'center',cursor:'pointer',position:'relative',transition:'all .15s'}}>
                   <div style={{fontSize:18,marginBottom:3}}>{c.icon}</div>
@@ -2737,40 +2950,38 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
             <button className="btn" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setModal({type:'catManage'})}>⚙️ Categorie</button>
           </div>
           {filteredProds.length===0
-            ? <div className="empty"><div className="empty-icon">📦</div><p>Nessun prodotto trovato</p></div>
-            : <div className="card-sm" style={{padding:'0 12px'}}>
-                {filteredProds.map(p=>{
-                  const cat=cats.find(c=>c.id===p.cat);
-                  return (
-                    <div key={p.id} className="ds-row" style={{opacity:p.disabled?0.4:1}}>
-                      <span style={{fontSize:16,flexShrink:0}}>{cat?.icon||'📦'}</span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:500,textDecoration:p.disabled?'line-through':'none'}}>{p.name}</div>
-                        {(p.qty||p.note)&&!p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
-                        {p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>disattivato</div>}
-                        <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
-                      </div>
-                      {!p.disabled && <>
-                        <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
-                          {dsStatusLabel(p.status||'ok')}
-                        </button>
-                        <button onClick={()=>toggleBuy(p.id)}
-                          style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:12,border:'1.5px solid',cursor:'pointer',whiteSpace:'nowrap',
-                            background:p.toBuy?'rgba(79,216,180,.15)':'transparent',
-                            color:p.toBuy?'var(--primary)':'var(--text3)',
-                            borderColor:p.toBuy?'var(--primary)':'transparent'}}>
-                          🛒{p.toBuy?' Spesa':''}
-                        </button>
-                      </>}
-                      {p.disabled && (
-                        <button className="btn btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--primary)'}}
-                          onClick={()=>setModal({type:'prod',data:{...p}})}>riattiva</button>
-                      )}
-                      <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
+            ?<div className="empty"><div className="empty-icon">📦</div><p>Nessun prodotto trovato</p></div>
+            :<div className="card-sm" style={{padding:'0 12px'}}>
+              {filteredProds.map(p=>{
+                const cat=cats.find(c=>c.id===p.cat);
+                return(
+                  <div key={p.id} className="ds-row" style={{opacity:p.disabled?0.4:1}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{cat?.icon||'📦'}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:500,textDecoration:p.disabled?'line-through':'none'}}>{p.name}</div>
+                      {(p.qty||p.note)&&!p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>{p.qty?'Qtà: '+p.qty:''}{p.qty&&p.note?' · ':''}{p.note}</div>}
+                      {p.disabled&&<div style={{fontSize:10,color:'var(--text3)'}}>disattivato</div>}
+                      <TagBadges itemTags={p.tags} visibleTags={visibleTags}/>
                     </div>
-                  );
-                })}
-              </div>
+                    {!p.disabled&&<>
+                      <button className={`ds-status ${dsStatusClass(p.status||'ok')}`} onClick={()=>setStatus(p.id,dsCycleStatus(p.status))}>
+                        {dsStatusLabel(p.status||'ok')}
+                      </button>
+                      <button onClick={()=>toggleBuy(p.id)}
+                        style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:12,border:'1.5px solid',cursor:'pointer',whiteSpace:'nowrap',
+                          background:p.toBuy?'rgba(79,216,180,.15)':'transparent',
+                          color:p.toBuy?'var(--primary)':'var(--text3)',
+                          borderColor:p.toBuy?'var(--primary)':'transparent'}}>
+                        🛒{p.toBuy?' Spesa':''}
+                      </button>
+                    </>}
+                    {p.disabled&&<button className="btn btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--primary)'}}
+                      onClick={()=>setModal({type:'prod',data:{...p}})}>riattiva</button>}
+                    <button className="btn-icon btn-sm" onClick={()=>setModal({type:'prod',data:{...p}})}>✏️</button>
+                  </div>
+                );
+              })}
+            </div>
           }
           <button className="ds-fab" onClick={()=>setModal({type:'prod',data:{id:null,name:'',cat:cats[0]?.id||'varie',qty:'',note:'',status:'ok',toBuy:false,disabled:false,luogoId:null}})}>+</button>
         </>)}
@@ -3232,9 +3443,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
           </div>
         ))}
         <button className="btn" style={{width:'100%',margin:'8px 0 4px',fontSize:12,padding:'7px'}}
-          onClick={()=>setModal({type:'luogo',data:{id:null,nome:'',icona:'📍'}})}>
-          + Nuovo luogo
-        </button>
+          onClick={()=>setModal({type:'luogo',data:{id:null,nome:'',icona:'📍'}})}>+ Nuovo luogo</button>
       </div>
       <div className="section-title" style={{marginBottom:10}}>🗂️ Categorie</div>
       <div className="card-sm" style={{padding:'0 12px',marginBottom:12}}>
@@ -3294,7 +3503,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v8.8 · Firebase · GitHub Pages
+        CamperHub v8.9 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -3601,9 +3810,9 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
               <input className="field-input" value={l.nome} onChange={e=>setData('nome')(e.target.value)} placeholder="es. Pensile cucina, Frigo, Bagagliaio…"/>
             </div>
             <div className="field" style={{gridColumn:'1/-1'}}>
-              <label className="field-label">Icona (emoji)</label>
+              <label className="field-label">Icona</label>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {['🏠','🧊','🍽️','🔧','📦','🛁','🚐','⛺','🪣','🗄️','🧺','💊','🔌','🪴'].map(em=>(
+                {['🏠','🧊','🍽️','🔧','📦','🛁','🚐','⛺','🪣','🗄️','🧺','💊','🔌','📍'].map(em=>(
                   <div key={em} onClick={()=>setData('icona')(em)}
                     style={{width:36,height:36,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',
                       fontSize:20,cursor:'pointer',border:'2px solid '+(l.icona===em?'var(--primary)':'var(--border)'),
@@ -3782,6 +3991,8 @@ function App(){
     const {id:_,createdAt:__,...rest}=data;
     firebase.firestore().collection('dispensa').doc(dispId).update(rest).catch(e=>console.error(e));
   };
+  const strutture = dispensa?.strutture || [];
+  const onUpdateStrutture = list => { if(dispId) updateDispensa({...dispensa, strutture:list}); };
   const signOut = () => firebase.auth().signOut();
 
   // Loading
@@ -3804,7 +4015,7 @@ function App(){
     const v=viaggi.find(x=>x.id===activeId);
     if(!v){ setActiveId(null); return null; }
     const gruppiEsistenti = [...new Set(viaggi.map(v=>(v.gruppo||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'));
-    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)} gruppiEsistenti={gruppiEsistenti}/>;
+    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)} gruppiEsistenti={gruppiEsistenti} strutture={strutture} onUpdateStrutture={onUpdateStrutture}/>;
   }
 
   // Viaggi section
@@ -3817,6 +4028,7 @@ function App(){
       delId={delId} setDel={setDel}
       showShare={showShare} setShare={setShare}
       addTrip={addTrip} removeTrip={removeTrip} updateTrip={updateTrip}
+      strutture={strutture} onUpdateStrutture={onUpdateStrutture}
     />
   );
 
@@ -3831,7 +4043,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v8.6</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v8.9</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
