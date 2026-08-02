@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.0</title>
+<title>🚐 CamperHub v9.1</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -488,7 +488,7 @@ const mkDispensaDoc = (uid, email) => ({
   categories:DISP_CATS_DEFAULT, products:mkDispProds(),
   spesaManuale:[], persone:DISP_PERS_DEFAULT,
   valigie:[], valigieProdotti:[],
-  tags:[], luoghi:[], strutture:[],
+  tags:[], luoghi:[], strutture:[], veicoli:[],
 });
 const dsStatusLabel = s => s==='ok'?'✅ OK':s==='low'?'⚠️ Scarso':'❌ Mancante';
 const dsStatusClass = s => s==='ok'?'ds-ok':s==='low'?'ds-low':'ds-out';
@@ -525,6 +525,7 @@ const fmtShort = d => { if(!d) return ""; const [,m,dd]=d.split("-"); return `${
 const fmtDate  = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/${m}/${y}`; };
 const n = v => +(v||0);
 const fmt2 = v => v.toFixed(2);
+const roundTo10 = v => Math.round(v/10)*10;
 const fmtH = h => { if(h==null||isNaN(h)) return ""; const s=h<0?"-":"",a=Math.abs(h); return `${s}${Math.floor(a)}h ${Math.floor((a%1)*60)}m`; };
 
 // ── Data ───────────────────────────────────────────────────────────────────
@@ -1684,14 +1685,14 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
     u("prezzoLitro", v);
     if(litriStimati>0 && v>0){
       const sug = litriStimati * v;
-      setF(p=>({...p, prezzoLitro:v, costoCarburante:Math.ceil(sug)}));
+      setF(p=>({...p, prezzoLitro:v, costoCarburante:roundTo10(sug)}));
     }
   };
   const onKmChange = v => {
     u("kmTappa", v);
     if(n(f.prezzoLitro)>0 && consumoMedio>0 && v>0){
       const lit = v*consumoMedio/100;
-      setF(p=>({...p, kmTappa:v, costoCarburante:Math.ceil(lit*n(p.prezzoLitro))}));
+      setF(p=>({...p, kmTappa:v, costoCarburante:roundTo10(lit*n(p.prezzoLitro))}));
     }
   };
 
@@ -1753,7 +1754,15 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
             {consumoMedio>0 && <div><span>Consumo</span><strong>{consumoMedio} l/100km</strong></div>}
             <div><span>KM tappa</span><strong style={{color:"var(--text)"}}>{n(f.kmTappa)} km</strong></div>
             <div><span>Litri stimati</span><strong style={{color:"var(--accent)"}}>{litriStimati.toFixed(1)} L</strong></div>
-            {costoStimato>0 && <div><span>Costo stimato</span><strong style={{color:"var(--accent)"}}>€{fmt2(costoStimato)}</strong></div>}
+            {costoStimato>0 && (
+              <div>
+                <span>Costo stimato</span>
+                <strong style={{color:"var(--accent)"}}>
+                  €{roundTo10(costoStimato)}
+                  <span style={{fontSize:10,fontWeight:400,color:'var(--text3)',marginLeft:4}}>({fmt2(costoStimato)})</span>
+                </strong>
+              </div>
+            )}
           </div>
         )}
         {costoStimato>0 && (
@@ -1761,12 +1770,12 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
             <label className="field-label">💳 Importo da inserire in tabella (modificabile)</label>
             <input type="number" className="field-input"
               value={f.costoCarburante||""}
-              placeholder={fmt2(costoStimato)}
+              placeholder={String(roundTo10(costoStimato))}
               onFocus={e=>e.target.select()}
               onChange={e=>u("costoCarburante",+e.target.value||0)}
               style={{fontSize:16,fontWeight:700,color:"var(--primary)"}}/>
             <span style={{fontSize:11,color:"var(--text3)",marginTop:4,display:"block"}}>
-              Suggerito: €{fmt2(costoStimato)} · puoi arrotondare o modificare
+              Arrotondato: €{roundTo10(costoStimato)} · Esatto: €{fmt2(costoStimato)}
             </span>
           </div>
         )}
@@ -1787,8 +1796,76 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
   );
 }
 
+// ── VeicoloPicker ────────────────────────────────────────────────────────────
+const VEICOLO_TIPI = [['🚐','Camper'],['🚗','Auto'],['🛵','Moto/Scooter'],['🚙','SUV'],['🚌','Bus/Camper GT'],['🚲','Bici']];
+function VeicoloPicker({veicoli, veicoloId, veicoloText, onSelect, onAddNew}){
+  const [q,setQ]       = React.useState(veicoloText||'');
+  const [open,setOpen] = React.useState(false);
+  const ref            = React.useRef(null);
+  React.useEffect(()=>{
+    const fn=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+    document.addEventListener('mousedown',fn);return()=>document.removeEventListener('mousedown',fn);
+  },[]);
+  const filtered=(veicoli||[]).filter(v=>v.nome.toLowerCase().includes(q.toLowerCase()));
+  const selV=(veicoli||[]).find(v=>v.id===veicoloId);
+  return(
+    <div ref={ref} style={{position:'relative',gridColumn:'1/-1'}}>
+      <label className="field-label">🚐 Veicolo</label>
+      <div style={{display:'flex',gap:6}}>
+        <input type="text" className="field-input" style={{flex:1}}
+          value={q} placeholder="Cerca o inserisci nome/targa..."
+          onChange={e=>{setQ(e.target.value);setOpen(true);}}
+          onFocus={()=>setOpen(true)}/>
+        {selV&&<button className="btn" style={{flexShrink:0,fontSize:11,padding:'6px 8px',color:'var(--text3)'}}
+          onClick={()=>{setQ('');onSelect(null);}}>✕</button>}
+      </div>
+      {selV&&!open&&(
+        <div style={{marginTop:4,fontSize:11,color:'var(--primary)'}}>
+          ✅ {selV.icona||'🚐'} {selV.nome} · consumo predefinito: {selV.consumoMedio} l/100km
+        </div>
+      )}
+      {open&&(
+        <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200,
+          background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,
+          maxHeight:200,overflowY:'auto',boxShadow:'0 6px 20px rgba(0,0,0,.4)'}}>
+          {filtered.length===0?(
+            <div>
+              <div style={{padding:'10px 14px',fontSize:12,color:'var(--text3)'}}>
+                {q?`Nessun veicolo trovato per "${q}"`:'Nessun veicolo nella lista'}
+              </div>
+              <button style={{width:'100%',padding:'10px 14px',textAlign:'left',fontSize:12,fontWeight:600,
+                background:'var(--primary-faint)',color:'var(--primary)',border:'none',cursor:'pointer'}}
+                onClick={()=>{setOpen(false);onAddNew(q);}}>
+                ➕ Aggiungi "{q||'nuovo veicolo'}"
+              </button>
+            </div>
+          ):filtered.map(v=>(
+            <div key={v.id}
+              style={{padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid var(--border)',
+                background:v.id===veicoloId?'var(--primary-faint)':'transparent',display:'flex',gap:10,alignItems:'center'}}
+              onClick={()=>{setQ(v.nome);setOpen(false);onSelect(v);}}>
+              <span style={{fontSize:20}}>{v.icona||'🚐'}</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:v.id===veicoloId?'var(--primary)':'var(--text)'}}>{v.nome}</div>
+                <div style={{fontSize:10,color:'var(--text3)'}}>Consumo: {v.consumoMedio} l/100km{v.note?` · ${v.note}`:''}</div>
+              </div>
+            </div>
+          ))}
+          {filtered.length>0&&q&&(
+            <button style={{width:'100%',padding:'8px 14px',textAlign:'left',fontSize:11,fontWeight:600,
+              color:'var(--primary)',background:'transparent',border:'none',borderTop:'1px solid var(--border)',cursor:'pointer'}}
+              onClick={()=>{setOpen(false);onAddNew(q);}}>
+              ➕ Aggiungi "{q}" come nuovo veicolo
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── New / Edit Trip Modal ─────────────────────────────────────────────────
-function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti=[]}){
+function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti=[], veicoli=[], onAddVeicolo}){
   const today = new Date().toISOString().slice(0,10);
   const [f,setF] = React.useState(initial ? {
     nome: initial.nome||(isCopy?initial.nome+' (copia)':''),
@@ -1796,11 +1873,12 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
     startDate: initial.startDate||today,
     endDate: initial.endDate||addDays(today,6),
     veicolo: initial.veicolo||'',
+    veicoloId: initial.veicoloId||null,
     consumoMedio: initial.consumoMedio||0,
     status: initial.status||'ipotesi',
     gruppo: initial.gruppo||'',
     sottogruppo: initial.sottogruppo||'',
-  } : {nome:'',budget:1000,startDate:today,endDate:addDays(today,6),veicolo:'',consumoMedio:0,status:'ipotesi',gruppo:'',sottogruppo:''});
+  } : {nome:'',budget:1000,startDate:today,endDate:addDays(today,6),veicolo:'',veicoloId:null,consumoMedio:0,status:'ipotesi',gruppo:'',sottogruppo:''});
   const [nuovoGruppo, setNuovoGruppo] = React.useState(
     !!(initial?.gruppo && !gruppiEsistenti.includes(initial.gruppo))
   );
@@ -1887,12 +1965,18 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
           <label className="field-label">Rientro</label>
           <input type="date" className="field-input" value={f.endDate} onChange={e=>u("endDate",e.target.value)}/>
         </div>
+        <VeicoloPicker veicoli={veicoli} veicoloId={f.veicoloId} veicoloText={f.veicolo}
+          onSelect={v=>{
+            if(!v){u('veicoloId',null);return;}
+            setF(p=>({...p,veicoloId:v.id,veicolo:v.nome,consumoMedio:v.consumoMedio||p.consumoMedio}));
+          }}
+          onAddNew={nome=>{
+            if(onAddVeicolo) onAddVeicolo(nome, newV=>{
+              setF(p=>({...p,veicoloId:newV.id,veicolo:newV.nome,consumoMedio:newV.consumoMedio||p.consumoMedio}));
+            });
+          }}/>
         <div className="field" style={{gridColumn:"1/-1"}}>
-          <label className="field-label">⛽ Veicolo (nome/targa)</label>
-          <input type="text" className="field-input" value={f.veicolo||""} onChange={e=>u("veicolo",e.target.value)} placeholder="es. Mobilvetta BP056YC"/>
-        </div>
-        <div className="field" style={{gridColumn:"1/-1"}}>
-          <label className="field-label">Consumo medio (l/100km)</label>
+          <label className="field-label">Consumo medio (l/100km) {f.veicoloId&&veicoli.find(v=>v.id===f.veicoloId)?<span style={{fontSize:10,color:'var(--text3)'}}>· da predefinito veicolo, modificabile</span>:''}</label>
           <input type="number" className="field-input" value={f.consumoMedio||""} placeholder="es. 12"
             onFocus={e=>e.target.select()} onChange={e=>u("consumoMedio",+e.target.value||0)}/>
         </div>
@@ -1907,7 +1991,7 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
 }
 
 // ── Trip View ──────────────────────────────────────────────────────────────
-function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[], strutture=[], onUpdateStrutture}){
+function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[], strutture=[], onUpdateStrutture, veicoli=[], onUpdateVeicoli}){
   useBack(back);
   const [tab, setTab]           = React.useState("preventivo");
   const [showTappa, setTappa]   = React.useState(false);
@@ -2144,7 +2228,9 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
 
       {showTappa && <TappaModal viaggio={viaggio} strutture={strutture} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setTappa(false)} onSave={addTappa}/>}
       {editingTappa && <TappaModal viaggio={viaggio} strutture={strutture} initial={editingTappa} onAddStruttura={(nome,cb)=>{const ns={id:'st_'+Date.now(),nome,piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''};if(onUpdateStrutture)onUpdateStrutture([...strutture,ns]);cb(ns);}} onClose={()=>setEditingTappa(null)} onSave={form=>editTappaFn(editingTappa,form)}/>}
-      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={gruppiEsistenti}/>}
+      {showEdit  && <TripFormModal initial={viaggio} title="Modifica viaggio" veicoli={veicoli}
+        onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
+        onClose={()=>setEdit(false)} onSave={editTrip} gruppiEsistenti={gruppiEsistenti}/>}
       {delTappa  && <Confirm msg={`Elimina la tappa "${delTappa.luogo}" e tutti i suoi dati struttura?`} onOk={()=>removeTappa(delTappa)} onClose={()=>setDelTappa(null)}/>}
       {fsGrid && <GridEditor data={data} budget={viaggio.budget} onChange={updateCell} fullscreen={true} onToggleFS={()=>setFsGrid(false)} onDayClick={i=>setDayModal(i)}/>}
       {dayModal!==null && <DayModal dayIndex={dayModal} data={data} budget={viaggio.budget} onClose={()=>setDayModal(null)} onChange={updateCell} consumoMedio={n(viaggio.consumoMedio)} prezzoCarburante={n(viaggio.prezzoCarburante)}/>}
@@ -2385,7 +2471,7 @@ function GruppiManager({gruppi, viaggi, updateTrip, onClose}){
   );
 }
 
-function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip, strutture=[], onUpdateStrutture}){
+function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip, strutture=[], onUpdateStrutture, veicoli=[], onUpdateVeicoli}){
   useBack(onBack);
   const [statusFil, setStatusFil] = React.useState('all');
   const [expandedY,  setExpandedY]  = React.useState({});
@@ -2393,8 +2479,10 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
   const [expandedSG, setExpandedSG] = React.useState({});
   const [copyData,   setCopyData]   = React.useState(null);
   const [showGruppi, setShowGruppi] = React.useState(false);
-  const [vsView,     setVsView]     = React.useState('viaggi'); // 'viaggi' | 'strutture'
-  const [strModal,   setStrModal]   = React.useState(null); // {data} per edit/nuovo struttura
+  const [vsView,     setVsView]     = React.useState('viaggi');
+  const [strSub,     setStrSub]     = React.useState('strutture'); // 'strutture'|'veicoli'
+  const [strModal,   setStrModal]   = React.useState(null);
+  const [veicoloModal, setVeicoloModal] = React.useState(null);
 
   const toggleStatus = (v) => {
     const newStatus = (v.status||'ipotesi')==='ipotesi' ? 'confermato' : 'ipotesi';
@@ -2437,7 +2525,8 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
           </div>
           {vsView==='viaggi'&&<button className="btn" style={{padding:'5px 8px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁</button>}
           {vsView==='viaggi'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>}
-          {vsView==='strutture'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',note:'',tariffe:[]}})}>＋ Struttura</button>}
+          {vsView==='strutture'&&strSub==='strutture'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',note:'',tariffe:[]}})}>＋ Struttura</button>}
+          {vsView==='strutture'&&strSub==='veicoli'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setVeicoloModal({id:null,nome:'',icona:'🚐',consumoMedio:0,note:''})}>＋ Veicolo</button>}
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16,flexShrink:0}}>🚪</button>
         </div>
       </div>
@@ -2463,38 +2552,63 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
       {/* ── VISTA STRUTTURE ── */}
       {vsView==='strutture'&&(
         <div className="container">
-          {strutture.length===0&&(
-            <div className="empty" style={{paddingTop:40}}>
-              <div className="empty-icon">🏕️</div>
-              <p>Nessuna struttura censita.<br/>Tocca "＋ Struttura" per aggiungerne una.</p>
-            </div>
-          )}
-          {strutture.map(s=>{
-            const sm = migrateTariffe(s);
-            return(
-              <div key={s.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px'}}>
-                <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{s.nome}</div>
-                    {sm.tariffe.length===0&&<div style={{fontSize:11,color:'var(--text3)'}}>Nessuna tariffa impostata</div>}
-                    {sm.tariffe.map(t=>(
-                      <div key={t.id} style={{fontSize:10,color:'var(--text3)',marginBottom:2}}>
-                        <span style={{color:'var(--primary)',fontWeight:600}}>{tariffLabel(t)}</span>
-                        {t.piazzola>0&&<span> · 🏕️€{t.piazzola}</span>}
-                        {t.costoPersona>0&&<span> · 👤€{t.costoPersona}</span>}
-                        {t.elettricita>0&&<span> · ⚡€{t.elettricita}</span>}
-                        {t.moto>0&&<span> · 🛵€{t.moto}</span>}
-                        {t.soggiorno>0&&<span> · 🏛️€{t.soggiorno}/p</span>}
-                        {t.doccia>0&&<span style={{color:'var(--primary)'}}> · 🚿€{t.doccia}</span>}
-                      </div>
-                    ))}
-                    {s.note&&<div style={{fontSize:11,color:'var(--text2)',marginTop:4}}>{s.note}</div>}
+          {/* Sub-toggle */}
+          <div style={{display:'flex',gap:0,borderRadius:10,overflow:'hidden',border:'1px solid var(--border)',marginBottom:14}}>
+            {[['strutture','🏕️ Strutture'],['veicoli','🚐 Veicoli']].map(([k,lbl])=>(
+              <button key={k} onClick={()=>setStrSub(k)}
+                style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',
+                  background:strSub===k?'var(--primary)':'var(--card)',
+                  color:strSub===k?'var(--bg)':'var(--text2)',transition:'background .15s'}}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+
+          {/* Lista strutture */}
+          {strSub==='strutture'&&(<>
+            {strutture.length===0&&<div className="empty" style={{paddingTop:30}}><div className="empty-icon">🏕️</div><p>Nessuna struttura censita.<br/>Tocca "＋ Struttura".</p></div>}
+            {strutture.map(s=>{
+              const sm=migrateTariffe(s);
+              return(
+                <div key={s.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px'}}>
+                  <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{s.nome}</div>
+                      {sm.tariffe.length===0&&<div style={{fontSize:11,color:'var(--text3)'}}>Nessuna tariffa</div>}
+                      {sm.tariffe.map(t=>(
+                        <div key={t.id} style={{fontSize:10,color:'var(--text3)',marginBottom:2}}>
+                          <span style={{color:'var(--primary)',fontWeight:600}}>{tariffLabel(t)}</span>
+                          {t.piazzola>0&&<span> · 🏕️€{t.piazzola}</span>}
+                          {t.costoPersona>0&&<span> · 👤€{t.costoPersona}</span>}
+                          {t.elettricita>0&&<span> · ⚡€{t.elettricita}</span>}
+                          {t.moto>0&&<span> · 🛵€{t.moto}</span>}
+                          {t.soggiorno>0&&<span> · 🏛️€{t.soggiorno}/p</span>}
+                          {t.doccia>0&&<span style={{color:'var(--primary)'}}> · 🚿€{t.doccia}</span>}
+                        </div>
+                      ))}
+                      {s.note&&<div style={{fontSize:11,color:'var(--text2)',marginTop:4}}>{s.note}</div>}
+                    </div>
+                    <button className="btn-icon btn-sm" onClick={()=>setStrModal({data:migrateTariffe({...s}),editingTar:null})}>✏️</button>
                   </div>
-                  <button className="btn-icon btn-sm" onClick={()=>setStrModal({data:migrateTariffe({...s}),editingTar:null})}>✏️</button>
                 </div>
+              );
+            })}
+          </>)}
+
+          {/* Lista veicoli */}
+          {strSub==='veicoli'&&(<>
+            {veicoli.length===0&&<div className="empty" style={{paddingTop:30}}><div className="empty-icon">🚐</div><p>Nessun veicolo censito.<br/>Tocca "＋ Veicolo".</p></div>}
+            {veicoli.map(v=>(
+              <div key={v.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px',display:'flex',alignItems:'center',gap:12}}>
+                <span style={{fontSize:24}}>{v.icona||'🚐'}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700}}>{v.nome}</div>
+                  <div style={{fontSize:11,color:'var(--text3)'}}>⛽ {v.consumoMedio} l/100km{v.note?` · ${v.note}`:''}</div>
+                </div>
+                <button className="btn-icon btn-sm" onClick={()=>setVeicoloModal({...v})}>✏️</button>
               </div>
-            );
-          })}
+            ))}
+          </>)}
         </div>
       )}
 
@@ -2630,14 +2744,70 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         </div>
       </div>)}
 
-      {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
-      {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti}
+      {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} veicoli={veicoli}
+        onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
+        onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
+      {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti} veicoli={veicoli}
+        onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
         initial={{...copyData, nome:copyData.nome+' (copia)', preventivo:undefined, consuntivo:undefined, tappe:[]}}
         onClose={()=>setCopyData(null)} onSave={f=>{addTrip(f);setCopyData(null);}}/>}
       {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`}
         onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
       {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
       {showGruppi&&<GruppiManager gruppi={gruppiEsistenti} viaggi={viaggi} updateTrip={updateTrip} onClose={()=>setShowGruppi(false)}/>}
+
+      {/* Modal Veicolo */}
+      {veicoloModal&&(
+        <Modal title={veicoloModal.id?'Modifica Veicolo':'Nuovo Veicolo'} onClose={()=>setVeicoloModal(null)} width="400px">
+          <div className="form-grid" style={{gap:10}}>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Nome / Targa *</label>
+              <input className="field-input" value={veicoloModal.nome||''} placeholder="es. Mobilvetta BP056YC"
+                onChange={e=>setVeicoloModal(m=>({...m,nome:e.target.value}))}/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Icona</label>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {VEICOLO_TIPI.map(([ic,lbl])=>(
+                  <div key={ic} onClick={()=>setVeicoloModal(m=>({...m,icona:ic}))}
+                    style={{padding:'6px 10px',borderRadius:8,cursor:'pointer',fontSize:18,
+                      border:'2px solid '+(veicoloModal.icona===ic?'var(--primary)':'var(--border)'),
+                      background:veicoloModal.icona===ic?'var(--primary-faint)':'var(--card)'}}
+                    title={lbl}>{ic}</div>
+                ))}
+              </div>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">⛽ Consumo medio predefinito (l/100km)</label>
+              <input type="number" className="field-input" value={veicoloModal.consumoMedio||''} placeholder="es. 12"
+                onFocus={e=>e.target.select()}
+                onChange={e=>setVeicoloModal(m=>({...m,consumoMedio:+e.target.value||0}))}/>
+            </div>
+            <div className="field" style={{gridColumn:'1/-1'}}>
+              <label className="field-label">Note</label>
+              <input className="field-input" value={veicoloModal.note||''} placeholder="Note opzionali"
+                onChange={e=>setVeicoloModal(m=>({...m,note:e.target.value}))}/>
+            </div>
+          </div>
+          <div className="btn-row">
+            <button className="btn-primary" onClick={()=>{
+              if(!veicoloModal.nome?.trim()){alert('Inserisci il nome');return;}
+              const v=veicoloModal;
+              const newList=v.id&&veicoli.find(x=>x.id===v.id)
+                ?veicoli.map(x=>x.id===v.id?v:x)
+                :[...veicoli,{...v,id:'veh_'+Date.now()}];
+              if(onUpdateVeicoli)onUpdateVeicoli(newList);
+              setVeicoloModal(null);
+            }}>✓ Salva</button>
+            {veicoloModal.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>{
+              if(!confirm('Eliminare veicolo?'))return;
+              if(onUpdateVeicoli)onUpdateVeicoli(veicoli.filter(x=>x.id!==veicoloModal.id));
+              setVeicoloModal(null);
+            }}>🗑️</button>}
+            <button className="btn" onClick={()=>setVeicoloModal(null)}>Annulla</button>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal Struttura */}
       {strModal&&(()=>{
@@ -3669,7 +3839,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.0 · Firebase · GitHub Pages
+        CamperHub v9.1 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4159,6 +4329,8 @@ function App(){
   };
   const strutture = dispensa?.strutture || [];
   const onUpdateStrutture = list => { if(dispId) updateDispensa({...dispensa, strutture:list}); };
+  const veicoli = dispensa?.veicoli || [];
+  const onUpdateVeicoli = list => { if(dispId) updateDispensa({...dispensa, veicoli:list}); };
   const signOut = () => firebase.auth().signOut();
 
   // Loading
@@ -4181,7 +4353,7 @@ function App(){
     const v=viaggi.find(x=>x.id===activeId);
     if(!v){ setActiveId(null); return null; }
     const gruppiEsistenti = [...new Set(viaggi.map(v=>(v.gruppo||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'));
-    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)} gruppiEsistenti={gruppiEsistenti} strutture={strutture} onUpdateStrutture={onUpdateStrutture}/>;
+    return <TripView viaggio={v} updateTrip={updateTrip} back={()=>setActiveId(null)} user={user} onShare={()=>setShare(v)} gruppiEsistenti={gruppiEsistenti} strutture={strutture} onUpdateStrutture={onUpdateStrutture} veicoli={veicoli} onUpdateVeicoli={onUpdateVeicoli}/>;
   }
 
   // Viaggi section
@@ -4195,6 +4367,7 @@ function App(){
       showShare={showShare} setShare={setShare}
       addTrip={addTrip} removeTrip={removeTrip} updateTrip={updateTrip}
       strutture={strutture} onUpdateStrutture={onUpdateStrutture}
+      veicoli={veicoli} onUpdateVeicoli={onUpdateVeicoli}
     />
   );
 
@@ -4209,7 +4382,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.0</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.1</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
