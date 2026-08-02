@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v9.5</title>
+<title>🚐 CamperHub v9.6</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1793,7 +1793,9 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
       <div style={{marginTop:16}}>
         <div className="section-title" style={{marginBottom:10}}>⛽ Carburante per questa tappa</div>
         <p style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>
-          KM e costo verranno inseriti nel giorno di viaggio (il giorno prima del check-in).
+          {notti===0
+            ? "KM e costo verranno inseriti nel giorno stesso della tappa di transito. Se già presenti da un'altra tappa, verranno sommati."
+            : "KM e costo verranno inseriti nel giorno di viaggio (il giorno prima del check-in)."}
         </p>
         <div className="form-grid" style={{gap:10}}>
           <div className="field">
@@ -2229,14 +2231,22 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
     }
 
-    // Km e carburante → giorno di viaggio
-    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
-    if(n(form.kmTappa)>0)         copy[tab][fuelIdx]={...copy[tab][fuelIdx], km:n(form.kmTappa)};
-    if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio:n(form.costoCarburante)};
-    // Traghetto → giorno di partenza o arrivo
+    // Km e carburante:
+    // - tappa normale → giorno PRIMA del check-in (come sempre)
+    // - tappa di transito → giorno STESSO (non c'è "prima"), somma se già presenti
+    const fuelIdx = isTransit ? sIdx : (sIdx > 0 ? sIdx - 1 : sIdx);
+    if(n(form.kmTappa)>0){
+      const kmPrev = isTransit ? n(copy[tab][fuelIdx].km) : 0;
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: kmPrev + n(form.kmTappa)};
+    }
+    if(n(form.costoCarburante)>0){
+      const gasPrev = isTransit ? n(copy[tab][fuelIdx].gasolio) : 0;
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: gasPrev + n(form.costoCarburante)};
+    }
+    // Traghetto → somma sempre (può coesistere con altri costi nello stesso giorno)
     if(n(form.costoTraghetto)>0){
-      const tragIdx = form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx;
-      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto:n(form.costoTraghetto)};
+      const tragIdx = isTransit ? sIdx : (form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx);
+      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(copy[tab][tragIdx].traghetto) + n(form.costoTraghetto)};
     }
 
     copy.tappe.push({...form,id:Date.now(),target:tab,idTappa:idT});
@@ -2295,12 +2305,18 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     }
     if(pagamentoCheckoutPrev>0) copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
 
-    const fuelIdx = sIdx > 0 ? sIdx - 1 : sIdx;
-    if(n(form.kmTappa)>0)         copy[tab][fuelIdx]={...copy[tab][fuelIdx], km:n(form.kmTappa)};
-    if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio:n(form.costoCarburante)};
+    const fuelIdx = isTransit ? sIdx : (sIdx > 0 ? sIdx - 1 : sIdx);
+    if(n(form.kmTappa)>0){
+      const kmPrev = isTransit ? n(copy[tab][fuelIdx].km) : 0;
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: kmPrev + n(form.kmTappa)};
+    }
+    if(n(form.costoCarburante)>0){
+      const gasPrev = isTransit ? n(copy[tab][fuelIdx].gasolio) : 0;
+      copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: gasPrev + n(form.costoCarburante)};
+    }
     if(n(form.costoTraghetto)>0){
-      const tragIdx = form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx;
-      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto:n(form.costoTraghetto)};
+      const tragIdx = isTransit ? sIdx : (form.traghettoGiorno==='arrivo' ? sIdx : fuelIdx);
+      copy[tab][tragIdx]={...copy[tab][tragIdx], traghetto: n(copy[tab][tragIdx].traghetto) + n(form.costoTraghetto)};
     }
     updateTrip(copy);
     setEditingTappa(null);
@@ -4179,7 +4195,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v9.5 · Firebase · GitHub Pages
+        CamperHub v9.6 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4722,7 +4738,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.5</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.6</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
