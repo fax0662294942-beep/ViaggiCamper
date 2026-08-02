@@ -2384,22 +2384,25 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
       <div className="app-header">
         <div style={{display:'flex',alignItems:'center',gap:8,width:'100%'}}>
           <button className="btn-icon" onClick={onBack} style={{flexShrink:0}}>←</button>
-          <div className="logo" style={{fontSize:15,flex:1}}>✈️ <strong>I miei viaggi</strong></div>
+          <div className="logo" style={{fontSize:15,flex:1}}>
+            {vsView==='strutture'
+              ? <><strong>🏕️ Strutture</strong></>
+              : <>✈️ <strong>I miei viaggi</strong></>}
+          </div>
           {vsView==='viaggi'&&<button className="btn" style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁 Gruppi</button>}
           {vsView==='viaggi'&&<button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>}
           {vsView==='strutture'&&<button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''}})}>＋ Struttura</button>}
+          {/* Bottone Strutture / torna Viaggi */}
+          <button className="btn-icon" title={vsView==='viaggi'?'Strutture':'Viaggi'}
+            onClick={()=>setVsView(v=>v==='viaggi'?'strutture':'viaggi')}
+            style={{fontSize:18,flexShrink:0,
+              color:vsView==='strutture'?'var(--primary)':'var(--text2)',
+              background:vsView==='strutture'?'var(--primary-faint)':'transparent',
+              borderRadius:8,border:'1px solid '+(vsView==='strutture'?'var(--primary)':'transparent'),
+              padding:'4px 6px'}}>
+            🏕️
+          </button>
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16,flexShrink:0}}>🚪</button>
-        </div>
-        {/* Tab switcher */}
-        <div style={{display:'flex',gap:0,borderRadius:10,overflow:'hidden',border:'1px solid var(--border)',margin:'10px 0 2px'}}>
-          {[['viaggi','✈️ Viaggi'],['strutture','🏕️ Strutture']].map(([k,lbl])=>(
-            <button key={k} onClick={()=>setVsView(k)}
-              style={{flex:1,padding:'8px 4px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',
-                background:vsView===k?'var(--primary)':'var(--card)',
-                color:vsView===k?'var(--bg)':'var(--text2)',transition:'background .15s'}}>
-              {lbl}
-            </button>
-          ))}
         </div>
       </div>
 
