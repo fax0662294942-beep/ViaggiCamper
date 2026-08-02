@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v10.1</title>
+<title>🚐 CamperHub v10.2</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2391,15 +2391,33 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     };
     const dailyChanged = DAILY_FIELDS.some(k => normF(k,form[k]) !== normF(k,oldTappa[k]));
     if(!dailyChanged){
-      const copy = {...viaggio,
+      const copy = {...viaggio,[tab]:[...viaggio[tab]],
         tappe:(viaggio.tappe||[]).map(t=>t.id===oldTappa.id?{...oldTappa,...form,idTappa:oldTappa.idTappa}:t)};
+      // Migrazione traghetto: se è sul giorno sbagliato (sIdx-1 = old code), spostalo su sIdx
+      const oldTrag = n(oldTappa.costoTraghetto||0);
+      if(oldTrag > 0 && sIdx > 0){
+        const prevD = copy[tab][sIdx-1];
+        const curD  = copy[tab][sIdx];
+        if(n(prevD.traghetto) >= oldTrag && n(curD.traghetto) < oldTrag){
+          copy[tab][sIdx-1] = {...prevD, traghetto: Math.max(0, n(prevD.traghetto) - oldTrag)};
+          copy[tab][sIdx]   = {...curD,  traghetto: n(curD.traghetto) + oldTrag};
+        }
+      }
       updateTrip(copy);
       setEditingTappa(null);
       return;
     }
 
     // ── FULL RE-APPLY ────────────────────────────────────────────────────
-    const copy = {...viaggio,[tab]:[...viaggio[tab]].map(d=>{
+    // Prima svuota vecchia posizione traghetto (sIdx-1, dove lo metteva il vecchio codice)
+    const baseCopy = [...viaggio[tab]];
+    const oldTrag = n(oldTappa.costoTraghetto||0);
+    if(oldTrag > 0 && sIdx > 0){
+      const prevD = baseCopy[sIdx-1];
+      if(n(prevD.traghetto) >= oldTrag)
+        baseCopy[sIdx-1] = {...prevD, traghetto: Math.max(0, n(prevD.traghetto) - oldTrag)};
+    }
+    const copy = {...viaggio,[tab]:baseCopy.map(d=>{
       if(d.idTappa!==oldTappa.idTappa) return d;
       if(d.prevIdTappa){
         const prevT=(viaggio.tappe||[]).find(t=>t.idTappa===d.prevIdTappa);
@@ -2440,7 +2458,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     if(n(form.kmTappa)>0)        copy[tab][fuelIdx]={...copy[tab][fuelIdx], km: n(form.kmTappa)};
     if(n(form.costoCarburante)>0) copy[tab][fuelIdx]={...copy[tab][fuelIdx], gasolio: n(form.costoCarburante)};
     if(n(form.costoTraghetto)>0)
-      copy[tab][sIdx]={...copy[tab][sIdx], traghetto: n(copy[tab][sIdx].traghetto) + n(form.costoTraghetto)};
+      copy[tab][sIdx]={...copy[tab][sIdx], traghetto: n(form.costoTraghetto)};
     updateTrip(copy);
     setEditingTappa(null);
   };
@@ -4322,7 +4340,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v10.1 · Firebase · GitHub Pages
+        CamperHub v10.2 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4865,7 +4883,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.1</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.2</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
