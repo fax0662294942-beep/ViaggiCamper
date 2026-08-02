@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v8.9</title>
+<title>🚐 CamperHub v9.0</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1512,8 +1512,48 @@ function TappaChain({tappe, data, tab, budget, onDelete, onUpdateBudget, onEdit}
   );
 }
 
+// ── Tariffe strutture ───────────────────────────────────────────────────────
+const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+const migrateTariffe = s => {
+  if(s.tariffe && s.tariffe.length>0) return s;
+  const hasCost = s.piazzola||s.costoPersona||s.elettricita||s.moto||s.soggiorno||s.doccia;
+  if(!hasCost) return {...s, tariffe:[]};
+  return {...s, tariffe:[{id:'t0',tipo:'anno',anno:new Date().getFullYear(),mese:null,dal:null,al:null,
+    piazzola:s.piazzola||0,costoPersona:s.costoPersona||0,elettricita:s.elettricita||0,
+    moto:s.moto||0,soggiorno:s.soggiorno||0,doccia:s.doccia||0}]};
+};
+const findTariff = (struttura, date) => {
+  if(!struttura) return null;
+  const s = migrateTariffe(struttura);
+  if(!s.tariffe||!s.tariffe.length) return null;
+  const d = date||new Date().toISOString().slice(0,10);
+  const y = +d.slice(0,4), m = +d.slice(5,7);
+  // Priority 1: range che contiene la data
+  const ranges = s.tariffe.filter(t=>t.tipo==='range'&&(!t.dal||d>=t.dal)&&(!t.al||d<=t.al));
+  if(ranges.length) return ranges.sort((a,b)=>{
+    const la=a.al&&a.dal?(new Date(a.al)-new Date(a.dal)):1e15;
+    const lb=b.al&&b.dal?(new Date(b.al)-new Date(b.dal)):1e15;
+    return la-lb;
+  })[0];
+  // Priority 2: mese
+  const meseM = s.tariffe.find(t=>t.tipo==='mese'&&t.anno===y&&t.mese===m);
+  if(meseM) return meseM;
+  // Priority 3: anno
+  const annoM = s.tariffe.find(t=>t.tipo==='anno'&&t.anno===y);
+  if(annoM) return annoM;
+  // fallback: ultima tariffa
+  return s.tariffe[s.tariffe.length-1];
+};
+const tariffLabel = t => {
+  if(!t) return '';
+  if(t.tipo==='anno') return `Anno ${t.anno}`;
+  if(t.tipo==='mese') return `${MESI[(t.mese||1)-1]} ${t.anno}`;
+  if(t.tipo==='range') return `${t.dal||'?'} → ${t.al||'?'}`;
+  return '';
+};
+
 // ── StrutturaPicker ─────────────────────────────────────────────────────────
-function StrutturaPicker({strutture, strutturaId, strutturaText, onSelect, onAddNew}){
+function StrutturaPicker({strutture, strutturaId, strutturaText, onSelect, onAddNew, tappaDate}){
   const [q,setQ]     = React.useState(strutturaText||'');
   const [open,setOpen] = React.useState(false);
   const refDiv = React.useRef(null);
@@ -1537,7 +1577,10 @@ function StrutturaPicker({strutture, strutturaId, strutturaText, onSelect, onAdd
       </div>
       {selSt&&!open&&(
         <div style={{marginTop:4,fontSize:11,color:'var(--primary)'}}>
-          ✅ {selSt.nome} · piazzola €{selSt.piazzola||0}/n · doccia €{selSt.doccia||0}/doccia
+          {(()=>{const t=findTariff(selSt,tappaDate);return t
+            ?<>✅ {selSt.nome} · <span style={{color:'var(--accent)'}}>{tariffLabel(t)}</span> · piazzola €{t.piazzola||0} · doccia €{t.doccia||0}</>
+            :<>✅ {selSt.nome} · <span style={{color:'var(--text3)'}}>nessuna tariffa per questo periodo</span></>;
+          })()}
         </div>
       )}
       {open&&(
@@ -1561,7 +1604,10 @@ function StrutturaPicker({strutture, strutturaId, strutturaText, onSelect, onAdd
               onClick={()=>{setQ(s.nome);setOpen(false);onSelect(s);}}>
               <div style={{fontSize:13,fontWeight:600,color:s.id===strutturaId?'var(--primary)':'var(--text)'}}>{s.nome}</div>
               <div style={{fontSize:10,color:'var(--text3)'}}>
-                Piazzola €{s.piazzola||0} · P.persona €{s.costoPersona||0} · Doccia €{s.doccia||0} · Sogg. €{s.soggiorno||0}/pers
+                {(()=>{const t=findTariff(s,tappaDate);return t
+                  ?<>📅 {tariffLabel(t)} · Piazzola €{t.piazzola||0} · Doccia €{t.doccia||0}</>
+                  :<>Nessuna tariffa per questo periodo</>;
+                })()}
               </div>
             </div>
           ))}
@@ -1619,15 +1665,16 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
   const onSelectStruttura = s => {
     if(!s){ u('strutturaId',null); return; }
     const nPers = n(f.numeroPersone)||2;
-    const docNotte = n(s.doccia)*nPers*2;
+    const t = findTariff(s, f.startDate) || {};
+    const docNotte = n(t.doccia)*nPers*2;
     setF(p=>({...p,
       strutturaId:  s.id,
       struttura:    s.nome,
-      costoPiazzola:n(s.piazzola),
-      costoPersona: n(s.costoPersona),
-      elettricita:  n(s.elettricita),
-      moto:         n(s.moto),
-      tassaSoggiorno:n(s.soggiorno),
+      costoPiazzola:n(t.piazzola),
+      costoPersona: n(t.costoPersona),
+      elettricita:  n(t.elettricita),
+      moto:         n(t.moto),
+      tassaSoggiorno:n(t.soggiorno),
       costoDoccia:  docNotte,
     }));
   };
@@ -1664,6 +1711,7 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
           <input type="text" className="field-input" value={f.luogo} onChange={e=>u("luogo",e.target.value)} placeholder="es. Roma"/>
         </div>
         <StrutturaPicker strutture={strutture} strutturaId={f.strutturaId} strutturaText={f.struttura}
+          tappaDate={f.startDate}
           onSelect={onSelectStruttura}
           onAddNew={nome=>{if(onAddStruttura)onAddStruttura(nome,onSelectStruttura);}}/>
         <NumField label="Costo piazzola €/notte"       value={f.costoPiazzola}    onChange={v=>u("costoPiazzola",v)}/>
@@ -2380,30 +2428,36 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
 
   return(
     <div>
-      {/* Header */}
+      {/* Header — semplificato, non va fuori schermo */}
       <div className="app-header">
-        <div style={{display:'flex',alignItems:'center',gap:8,width:'100%'}}>
+        <div style={{display:'flex',alignItems:'center',gap:6,width:'100%'}}>
           <button className="btn-icon" onClick={onBack} style={{flexShrink:0}}>←</button>
-          <div className="logo" style={{fontSize:15,flex:1}}>
-            {vsView==='strutture'
-              ? <><strong>🏕️ Strutture</strong></>
-              : <>✈️ <strong>I miei viaggi</strong></>}
+          <div className="logo" style={{fontSize:14,flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+            {vsView==='strutture'?'🏕️ Strutture':'✈️ Viaggi'}
           </div>
-          {vsView==='viaggi'&&<button className="btn" style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁 Gruppi</button>}
-          {vsView==='viaggi'&&<button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>}
-          {vsView==='strutture'&&<button className="btn-primary" style={{padding:'6px 12px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0,note:''}})}>＋ Struttura</button>}
-          {/* Bottone Strutture / torna Viaggi */}
-          <button className="btn-icon" title={vsView==='viaggi'?'Strutture':'Viaggi'}
-            onClick={()=>setVsView(v=>v==='viaggi'?'strutture':'viaggi')}
-            style={{fontSize:18,flexShrink:0,
-              color:vsView==='strutture'?'var(--primary)':'var(--text2)',
-              background:vsView==='strutture'?'var(--primary-faint)':'transparent',
-              borderRadius:8,border:'1px solid '+(vsView==='strutture'?'var(--primary)':'transparent'),
-              padding:'4px 6px'}}>
-            🏕️
-          </button>
+          {vsView==='viaggi'&&<button className="btn" style={{padding:'5px 8px',fontSize:11,flexShrink:0}} onClick={()=>setShowGruppi(true)}>📁</button>}
+          {vsView==='viaggi'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>}
+          {vsView==='strutture'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',note:'',tariffe:[]}})}>＋ Struttura</button>}
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16,flexShrink:0}}>🚪</button>
         </div>
+      </div>
+
+      {/* Barra filtri + bottone Strutture */}
+      <div style={{display:'flex',alignItems:'center',gap:5,padding:'8px 12px',borderBottom:'1px solid var(--border)',background:'var(--card)',flexWrap:'wrap'}}>
+        {vsView==='viaggi'&&[['all',`Tutti (${viaggi.length})`],['ipotesi',`💭 ${totIpotesi}`],['confermato',`✅ ${totConf}`]].map(([f,l])=>(
+          <button key={f} className={`btn-tab${statusFil===f?' active':''}`}
+            style={{padding:'5px 8px',fontSize:11,flexShrink:0}} onClick={()=>setStatusFil(f)}>{l}</button>
+        ))}
+        {vsView==='strutture'&&<span style={{fontSize:11,color:'var(--text2)',flex:1}}>{strutture.length} strutture censite</span>}
+        <div style={{flex:1}}/>
+        {/* Tab Strutture — sempre visibile */}
+        <button onClick={()=>setVsView(v=>v==='viaggi'?'strutture':'viaggi')}
+          style={{padding:'5px 10px',fontSize:11,fontWeight:700,borderRadius:20,cursor:'pointer',flexShrink:0,
+            border:'1.5px solid '+(vsView==='strutture'?'var(--primary)':'var(--border)'),
+            background:vsView==='strutture'?'var(--primary)':'transparent',
+            color:vsView==='strutture'?'var(--bg)':'var(--text2)'}}>
+          🏕️ Strutture
+        </button>
       </div>
 
       {/* ── VISTA STRUTTURE ── */}
@@ -2412,40 +2466,41 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
           {strutture.length===0&&(
             <div className="empty" style={{paddingTop:40}}>
               <div className="empty-icon">🏕️</div>
-              <p>Nessuna struttura censita.<br/>Aggiungile con il bottone ＋</p>
+              <p>Nessuna struttura censita.<br/>Tocca "＋ Struttura" per aggiungerne una.</p>
             </div>
           )}
-          {strutture.map(s=>(
-            <div key={s.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px'}}>
-              <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{s.nome}</div>
-                  <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:11,color:'var(--text3)'}}>
-                    {s.piazzola>0&&<span>🏕️ Piazzola: €{s.piazzola}/n</span>}
-                    {s.costoPersona>0&&<span>👤 Persona: €{s.costoPersona}/n</span>}
-                    {s.elettricita>0&&<span>⚡ Elett.: €{s.elettricita}/n</span>}
-                    {s.moto>0&&<span>🛵 Moto: €{s.moto}/n</span>}
-                    {s.soggiorno>0&&<span>🏛️ Sogg.: €{s.soggiorno}/pers/n</span>}
-                    {s.doccia>0&&<span style={{color:'var(--primary)'}}>🚿 Doccia: €{s.doccia}/doccia</span>}
+          {strutture.map(s=>{
+            const sm = migrateTariffe(s);
+            return(
+              <div key={s.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px'}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{s.nome}</div>
+                    {sm.tariffe.length===0&&<div style={{fontSize:11,color:'var(--text3)'}}>Nessuna tariffa impostata</div>}
+                    {sm.tariffe.map(t=>(
+                      <div key={t.id} style={{fontSize:10,color:'var(--text3)',marginBottom:2}}>
+                        <span style={{color:'var(--primary)',fontWeight:600}}>{tariffLabel(t)}</span>
+                        {t.piazzola>0&&<span> · 🏕️€{t.piazzola}</span>}
+                        {t.costoPersona>0&&<span> · 👤€{t.costoPersona}</span>}
+                        {t.elettricita>0&&<span> · ⚡€{t.elettricita}</span>}
+                        {t.moto>0&&<span> · 🛵€{t.moto}</span>}
+                        {t.soggiorno>0&&<span> · 🏛️€{t.soggiorno}/p</span>}
+                        {t.doccia>0&&<span style={{color:'var(--primary)'}}> · 🚿€{t.doccia}</span>}
+                      </div>
+                    ))}
+                    {s.note&&<div style={{fontSize:11,color:'var(--text2)',marginTop:4}}>{s.note}</div>}
                   </div>
-                  {s.note&&<div style={{fontSize:11,color:'var(--text2)',marginTop:4}}>{s.note}</div>}
+                  <button className="btn-icon btn-sm" onClick={()=>setStrModal({data:migrateTariffe({...s}),editingTar:null})}>✏️</button>
                 </div>
-                <button className="btn-icon btn-sm" onClick={()=>setStrModal({data:{...s}})}>✏️</button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* ── VISTA VIAGGI ── */}
-      {vsView==='viaggi'&&(<>
-        {/* Filtri */}
-        <div style={{display:'flex',gap:5,padding:'10px 16px',borderBottom:'1px solid var(--border)',background:'var(--card)',overflowX:'auto'}}>
-          {[['all',`Tutti (${viaggi.length})`],['ipotesi',`💭 Ipotesi (${totIpotesi})`],['confermato',`✅ Confermati (${totConf})`]].map(([f,l])=>(
-            <button key={f} className={`btn-tab${statusFil===f?' active':''}`}
-              style={{padding:'5px 10px',fontSize:11,flexShrink:0}} onClick={()=>setStatusFil(f)}>{l}</button>
-          ))}
-        </div>
+      {vsView==='viaggi'&&(
+        <div>
 
         <div className="container">
           {filtered.length===0&&(
@@ -2573,7 +2628,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
             );
           })}
         </div>
-      </>)}
+      </div>)}
 
       {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
       {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti}
@@ -2585,50 +2640,158 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
       {showGruppi&&<GruppiManager gruppi={gruppiEsistenti} viaggi={viaggi} updateTrip={updateTrip} onClose={()=>setShowGruppi(false)}/>}
 
       {/* Modal Struttura */}
-      {strModal&&(
-        <Modal title={strModal.data.id?'Modifica Struttura':'Nuova Struttura'} onClose={()=>setStrModal(null)} width="480px">
-          <div className="form-grid" style={{gap:10}}>
-            <div className="field" style={{gridColumn:'1/-1'}}>
-              <label className="field-label">Nome *</label>
-              <input className="field-input" value={strModal.data.nome||''} onChange={e=>setStrModal(m=>({...m,data:{...m.data,nome:e.target.value}}))} placeholder="es. Camping Bella Vista, Agriturismo Rossi..."/>
-            </div>
-            {[['piazzola','🏕️ Piazzola €/notte'],['costoPersona','👤 Costo persona €/notte'],['elettricita','⚡ Elettricità €/notte'],['moto','🛵 Moto €/notte'],['soggiorno','🏛️ Tassa soggiorno €/pers/notte'],['doccia','🚿 Doccia €/doccia']].map(([k,lbl])=>(
-              <div key={k} className="field">
-                <label className="field-label">{lbl}</label>
-                <input type="number" className="field-input" value={strModal.data[k]||''} placeholder="0"
-                  onFocus={e=>e.target.select()}
-                  onChange={e=>setStrModal(m=>({...m,data:{...m.data,[k]:+e.target.value||0}}))}/>
+      {strModal&&(()=>{
+        const s = strModal.data;
+        const tariffe = s.tariffe || [];
+        const editingTar = strModal.editingTar; // null = lista | {} = nuova/modifica
+        const setS = fn => setStrModal(m=>({...m,data:{...m.data,...fn(m.data)}}));
+        const setTar = fn => setStrModal(m=>({...m,editingTar:{...m.editingTar,...fn(m.editingTar)}}));
+        const saveTar = () => {
+          const t = strModal.editingTar;
+          if(!t) return;
+          const updated = t.id && tariffe.find(x=>x.id===t.id)
+            ? tariffe.map(x=>x.id===t.id?t:x)
+            : [...tariffe,{...t,id:'t'+Date.now()}];
+          setStrModal(m=>({...m,data:{...m.data,tariffe:updated},editingTar:null}));
+        };
+        const delTar = id => setStrModal(m=>({...m,data:{...m.data,tariffe:tariffe.filter(x=>x.id!==id)}}));
+        const anno = new Date().getFullYear();
+
+        if(editingTar!==undefined&&editingTar!==null){
+          // ── Editor singola tariffa ──
+          const t = editingTar;
+          return(
+            <Modal title="Tariffa" onClose={()=>setStrModal(m=>({...m,editingTar:null}))} width="460px">
+              <div className="form-grid" style={{gap:10}}>
+                {/* Tipo periodo */}
+                <div className="field" style={{gridColumn:'1/-1'}}>
+                  <label className="field-label">Periodo di validità</label>
+                  <div style={{display:'flex',gap:8}}>
+                    {[['anno','📅 Tutto l\'anno'],['mese','🗓️ Mese'],['range','📆 Date']].map(([v,lbl])=>(
+                      <button key={v} onClick={()=>setTar(()=>({...t,tipo:v}))}
+                        style={{flex:1,padding:'7px 4px',borderRadius:8,fontSize:11,fontWeight:600,cursor:'pointer',
+                          border:'1.5px solid '+(t.tipo===v?'var(--primary)':'var(--border)'),
+                          background:t.tipo===v?'var(--primary-faint)':'var(--card)',
+                          color:t.tipo===v?'var(--primary)':'var(--text2)'}}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Anno (sempre visibile) */}
+                <div className="field">
+                  <label className="field-label">Anno</label>
+                  <input type="number" className="field-input" value={t.anno||anno} min="2020" max="2035"
+                    onFocus={e=>e.target.select()} onChange={e=>setTar(()=>({...t,anno:+e.target.value||anno}))}/>
+                </div>
+                {/* Mese — solo se tipo=mese */}
+                {t.tipo==='mese'&&(
+                  <div className="field">
+                    <label className="field-label">Mese</label>
+                    <select className="field-input" value={t.mese||1} onChange={e=>setTar(()=>({...t,mese:+e.target.value}))}>
+                      {MESI.map((nm,i)=><option key={i+1} value={i+1}>{nm}</option>)}
+                    </select>
+                  </div>
+                )}
+                {/* Date — solo se tipo=range */}
+                {t.tipo==='range'&&(<>
+                  <div className="field">
+                    <label className="field-label">Dal</label>
+                    <input type="date" className="field-input" value={t.dal||''} onChange={e=>setTar(()=>({...t,dal:e.target.value}))}/>
+                  </div>
+                  <div className="field">
+                    <label className="field-label">Al</label>
+                    <input type="date" className="field-input" value={t.al||''} onChange={e=>setTar(()=>({...t,al:e.target.value}))}/>
+                  </div>
+                </>)}
+                <div style={{gridColumn:'1/-1',borderTop:'1px solid var(--border)',paddingTop:10,fontSize:11,fontWeight:700,color:'var(--text2)'}}>
+                  💰 Prezzi per questa tariffa
+                </div>
+                {[['piazzola','🏕️ Piazzola €/notte'],['costoPersona','👤 Persona €/notte'],
+                  ['elettricita','⚡ Elettricità €/notte'],['moto','🛵 Moto €/notte'],
+                  ['soggiorno','🏛️ Soggiorno €/pers/notte'],['doccia','🚿 Doccia €/doccia']].map(([k,lbl])=>(
+                  <div key={k} className="field">
+                    <label className="field-label">{lbl}</label>
+                    <input type="number" className="field-input" value={t[k]||''} placeholder="0"
+                      onFocus={e=>e.target.select()} onChange={e=>setTar(()=>({...t,[k]:+e.target.value||0}))}/>
+                  </div>
+                ))}
+                {(t.doccia>0)&&(
+                  <div style={{gridColumn:'1/-1',background:'var(--primary-faint)',borderRadius:8,padding:'8px 12px',fontSize:11,color:'var(--primary)'}}>
+                    🚿 2 persone: €{((t.doccia||0)*2*2).toFixed(2)}/notte · 3 persone: €{((t.doccia||0)*3*2).toFixed(2)}/notte
+                  </div>
+                )}
               </div>
-            ))}
-            <div className="field" style={{gridColumn:'1/-1'}}>
-              <label className="field-label">Note</label>
-              <input className="field-input" value={strModal.data.note||''} onChange={e=>setStrModal(m=>({...m,data:{...m.data,note:e.target.value}}))} placeholder="Note opzionali"/>
-            </div>
-            {strModal.data.doccia>0&&(
-              <div style={{gridColumn:'1/-1',background:'var(--primary-faint)',borderRadius:8,padding:'8px 12px',fontSize:11,color:'var(--primary)'}}>
-                🚿 Con 2 persone: €{(strModal.data.doccia*2*2).toFixed(2)}/notte · Con 3 persone: €{(strModal.data.doccia*3*2).toFixed(2)}/notte
+              <div className="btn-row">
+                <button className="btn-primary" onClick={saveTar}>✓ Salva tariffa</button>
+                <button className="btn" onClick={()=>setStrModal(m=>({...m,editingTar:null}))}>← Annulla</button>
               </div>
-            )}
-          </div>
-          <div className="btn-row">
-            <button className="btn-primary" onClick={()=>{
-              if(!strModal.data.nome?.trim()){alert('Inserisci il nome');return;}
-              const s=strModal.data;
-              const newList=s.id&&strutture.find(x=>x.id===s.id)
-                ?strutture.map(x=>x.id===s.id?s:x)
-                :[...strutture,{...s,id:'st_'+Date.now()}];
-              if(onUpdateStrutture)onUpdateStrutture(newList);
-              setStrModal(null);
-            }}>✓ Salva</button>
-            {strModal.data.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>{
-              if(!confirm('Eliminare struttura?'))return;
-              if(onUpdateStrutture)onUpdateStrutture(strutture.filter(x=>x.id!==strModal.data.id));
-              setStrModal(null);
-            }}>🗑️</button>}
-            <button className="btn" onClick={()=>setStrModal(null)}>Annulla</button>
-          </div>
-        </Modal>
-      )}
+            </Modal>
+          );
+        }
+
+        // ── Vista principale struttura ──
+        return(
+          <Modal title={s.id?'Modifica Struttura':'Nuova Struttura'} onClose={()=>setStrModal(null)} width="480px">
+            <div className="form-grid" style={{gap:10}}>
+              <div className="field" style={{gridColumn:'1/-1'}}>
+                <label className="field-label">Nome *</label>
+                <input className="field-input" value={s.nome||''} onChange={e=>setS(()=>({nome:e.target.value}))} placeholder="es. Camping Bella Vista, Agriturismo Rossi..."/>
+              </div>
+              <div className="field" style={{gridColumn:'1/-1'}}>
+                <label className="field-label">Note</label>
+                <input className="field-input" value={s.note||''} onChange={e=>setS(()=>({note:e.target.value}))} placeholder="Note opzionali (indirizzo, contatti...)"/>
+              </div>
+            </div>
+
+            {/* Sezione tariffe */}
+            <div style={{margin:'14px 0 8px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                <div className="section-title" style={{margin:0}}>📅 Tariffe per periodo</div>
+                <button className="btn" style={{fontSize:11,padding:'4px 10px'}}
+                  onClick={()=>setStrModal(m=>({...m,editingTar:{tipo:'anno',anno,mese:1,dal:'',al:'',piazzola:0,costoPersona:0,elettricita:0,moto:0,soggiorno:0,doccia:0}}))}>
+                  + Tariffa
+                </button>
+              </div>
+              {tariffe.length===0&&<p style={{fontSize:12,color:'var(--text3)',padding:'4px 0'}}>Nessuna tariffa — aggiungine una con il bottone.</p>}
+              {tariffe.map(t=>(
+                <div key={t.id} className="card-sm" style={{padding:'10px 12px',marginBottom:8,display:'flex',alignItems:'flex-start',gap:8}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'var(--primary)',marginBottom:3}}>{tariffLabel(t)}</div>
+                    <div style={{fontSize:10,color:'var(--text3)',display:'flex',flexWrap:'wrap',gap:6}}>
+                      {t.piazzola>0&&<span>🏕️ €{t.piazzola}/n</span>}
+                      {t.costoPersona>0&&<span>👤 €{t.costoPersona}/pers</span>}
+                      {t.elettricita>0&&<span>⚡ €{t.elettricita}</span>}
+                      {t.moto>0&&<span>🛵 €{t.moto}</span>}
+                      {t.soggiorno>0&&<span>🏛️ €{t.soggiorno}/pers</span>}
+                      {t.doccia>0&&<span>🚿 €{t.doccia}/doccia</span>}
+                    </div>
+                  </div>
+                  <button className="btn-icon btn-sm" onClick={()=>setStrModal(m=>({...m,editingTar:{...t}}))} title="Modifica">✏️</button>
+                  <button className="btn-icon btn-sm" style={{color:'var(--red)'}} onClick={()=>delTar(t.id)} title="Elimina">🗑️</button>
+                </div>
+              ))}
+            </div>
+
+            <div className="btn-row">
+              <button className="btn-primary" onClick={()=>{
+                if(!s.nome?.trim()){alert('Inserisci il nome');return;}
+                const newList=s.id&&strutture.find(x=>x.id===s.id)
+                  ?strutture.map(x=>x.id===s.id?s:x)
+                  :[...strutture,{...s,id:'st_'+Date.now()}];
+                if(onUpdateStrutture)onUpdateStrutture(newList);
+                setStrModal(null);
+              }}>✓ Salva struttura</button>
+              {s.id&&<button className="btn" style={{color:'var(--red)'}} onClick={()=>{
+                if(!confirm('Eliminare struttura?'))return;
+                if(onUpdateStrutture)onUpdateStrutture(strutture.filter(x=>x.id!==s.id));
+                setStrModal(null);
+              }}>🗑️</button>}
+              <button className="btn" onClick={()=>setStrModal(null)}>Annulla</button>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
@@ -3506,7 +3669,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v8.9 · Firebase · GitHub Pages
+        CamperHub v9.0 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4046,7 +4209,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v8.9</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v9.0</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
