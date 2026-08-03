@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v10.1</title>
+<title>🚐 CamperHub v10.8</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -670,7 +670,7 @@ function NumField({label, value, onChange, placeholder="0"}){
   return (
     <div className="field">
       <label className="field-label">{label}</label>
-      <input type="number" className="field-input" value={value??""} placeholder={placeholder}
+      <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={value??""} placeholder={placeholder}
         onFocus={e=>e.target.select()}
         onChange={e=>onChange(e.target.value===""?0:+e.target.value)}/>
     </div>
@@ -1381,11 +1381,11 @@ function DayModal({dayIndex, data, budget, onClose, onChange, consumoMedio, prez
                   <input type="text" className="field-input" value={d[f.key]||""}
                     onChange={e=>update(f.key, e.target.value)}/>
                 ) : f.type==="numopt" ? (
-                  <input type="number" className="field-input" value={d[f.key]??""} placeholder="auto"
+                  <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={d[f.key]??""} placeholder="auto"
                     onFocus={e=>e.target.select()}
                     onChange={e=>update(f.key, e.target.value===""?"":+e.target.value)}/>
                 ) : (
-                  <input type="number" className="field-input"
+                  <input type="number" className="field-input" autoComplete="off" data-form-type="other"
                     value={d[f.key]===0?"":d[f.key]??""} placeholder="0"
                     onFocus={e=>e.target.select()}
                     onChange={e=>update(f.key, e.target.value===""?0:+e.target.value)}/>
@@ -1831,12 +1831,12 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
         <div className="form-grid" style={{gap:10}}>
           <div className="field">
             <label className="field-label">Traghetto € — giorno check-in</label>
-            <input type="number" className="field-input" value={f.costoTraghetto||""} placeholder="0"
+            <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.costoTraghetto||""} placeholder="0"
               onFocus={e=>e.target.select()} onChange={e=>u("costoTraghetto",+e.target.value||0)}/>
           </div>
           <div className="field">
             <label className="field-label">Pedaggi € — giorno check-in</label>
-            <input type="number" className="field-input" value={f.pedaggi||""} placeholder="0"
+            <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.pedaggi||""} placeholder="0"
               onFocus={e=>e.target.select()} onChange={e=>u("pedaggi",+e.target.value||0)}/>
           </div>
         </div>
@@ -1851,12 +1851,12 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
         <div className="form-grid" style={{gap:10}}>
           <div className="field">
             <label className="field-label">KM da percorrere</label>
-            <input type="number" className="field-input" value={f.kmTappa||""} placeholder="es. 250"
+            <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.kmTappa||""} placeholder="es. 250"
               onFocus={e=>e.target.select()} onChange={e=>onKmChange(+e.target.value||0)}/>
           </div>
           <div className="field">
             <label className="field-label">Prezzo diesel €/litro</label>
-            <input type="number" className="field-input" value={f.prezzoLitro||""} placeholder="es. 1.72"
+            <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.prezzoLitro||""} placeholder="es. 1.72"
               onFocus={e=>e.target.select()} onChange={e=>onPrezzoLitro(+e.target.value||0)}/>
           </div>
         </div>
@@ -1882,7 +1882,7 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
         {costoStimato>0 && (
           <div className="field" style={{marginTop:10}}>
             <label className="field-label">💳 Importo da inserire in tabella (modificabile)</label>
-            <input type="number" className="field-input"
+            <input type="number" className="field-input" autoComplete="off" data-form-type="other"
               value={f.costoCarburante||""}
               placeholder={String(roundTo10(costoStimato))}
               onFocus={e=>e.target.select()}
@@ -2089,7 +2089,7 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
         </div>
         <div className="field" style={{gridColumn:"1/-1"}}>
           <label className="field-label">Budget iniziale €</label>
-          <input type="number" className="field-input" value={f.budget} onFocus={e=>e.target.select()} onChange={e=>u("budget",+e.target.value||0)}/>
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.budget} onFocus={e=>e.target.select()} onChange={e=>u("budget",+e.target.value||0)}/>
         </div>
         <div className="field">
           <label className="field-label">Partenza</label>
@@ -2111,7 +2111,7 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
           }}/>
         <div className="field" style={{gridColumn:"1/-1"}}>
           <label className="field-label">Consumo medio (l/100km) {f.veicoloId&&veicoli.find(v=>v.id===f.veicoloId)?<span style={{fontSize:10,color:'var(--text3)'}}>· da predefinito veicolo, modificabile</span>:''}</label>
-          <input type="number" className="field-input" value={f.consumoMedio||""} placeholder="es. 12"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.consumoMedio||""} placeholder="es. 12"
             onFocus={e=>e.target.select()} onChange={e=>u("consumoMedio",+e.target.value||0)}/>
         </div>
       </div>
@@ -2158,7 +2158,7 @@ function FillDaysModal({data, onApply, onClose}){
       {/* Importo */}
       <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:14}}>
         <label style={{fontSize:13,color:'var(--text2)',flexShrink:0}}>Importo €</label>
-        <input type="number" className="field-input" style={{flex:1,fontSize:16,fontWeight:700,color:catInfo.color}}
+        <input type="number" className="field-input" autoComplete="off" data-form-type="other" style={{flex:1,fontSize:16,fontWeight:700,color:catInfo.color}}
           value={amount} placeholder="es. 32"
           onFocus={e=>e.target.select()} onChange={e=>setAmount(e.target.value)}/>
       </div>
@@ -2263,12 +2263,12 @@ function RientroModal({viaggio, tab, onClose, onSave}){
       <div className="form-grid" style={{gap:10,marginBottom:14}}>
         <div className="field">
           <label className="field-label">KM percorsi</label>
-          <input type="number" className="field-input" value={f.km||""} placeholder="es. 180"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.km||""} placeholder="es. 180"
             onFocus={e=>e.target.select()} onChange={e=>onKmChange(+e.target.value||0)}/>
         </div>
         <div className="field">
           <label className="field-label">Prezzo diesel €/litro</label>
-          <input type="number" className="field-input" value={f.prezzoLitro||""} placeholder="es. 1.72"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.prezzoLitro||""} placeholder="es. 1.72"
             onFocus={e=>e.target.select()} onChange={e=>onPrezzoLitro(+e.target.value||0)}/>
         </div>
         {litriStimati>0&&(
@@ -2283,17 +2283,17 @@ function RientroModal({viaggio, tab, onClose, onSave}){
         )}
         <div className="field">
           <label className="field-label">💳 Carburante €</label>
-          <input type="number" className="field-input" value={f.gasolio||""} placeholder="0"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.gasolio||""} placeholder="0"
             onFocus={e=>e.target.select()} onChange={e=>u("gasolio",+e.target.value||0)}/>
         </div>
         <div className="field">
           <label className="field-label">Pedaggi €</label>
-          <input type="number" className="field-input" value={f.pedaggi||""} placeholder="0"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.pedaggi||""} placeholder="0"
             onFocus={e=>e.target.select()} onChange={e=>u("pedaggi",+e.target.value||0)}/>
         </div>
         <div className="field" style={{gridColumn:'1/-1'}}>
           <label className="field-label">🚢 Traghetto € (se previsto)</label>
-          <input type="number" className="field-input" value={f.traghetto||""} placeholder="0"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.traghetto||""} placeholder="0"
             onFocus={e=>e.target.select()} onChange={e=>u("traghetto",+e.target.value||0)}/>
         </div>
       </div>
@@ -2301,12 +2301,12 @@ function RientroModal({viaggio, tab, onClose, onSave}){
       <div className="form-grid" style={{gap:10,marginBottom:14}}>
         <div className="field">
           <label className="field-label">Pranzo/Cena €</label>
-          <input type="number" className="field-input" value={f.cena||""} placeholder="0"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.cena||""} placeholder="0"
             onFocus={e=>e.target.select()} onChange={e=>u("cena",+e.target.value||0)}/>
         </div>
         <div className="field">
           <label className="field-label">Colazione €</label>
-          <input type="number" className="field-input" value={f.colazione||""} placeholder="0"
+          <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={f.colazione||""} placeholder="0"
             onFocus={e=>e.target.select()} onChange={e=>u("colazione",+e.target.value||0)}/>
         </div>
       </div>
@@ -3364,7 +3364,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
             </div>
             <div className="field" style={{gridColumn:'1/-1'}}>
               <label className="field-label">⛽ Consumo medio predefinito (l/100km)</label>
-              <input type="number" className="field-input" value={veicoloModal.consumoMedio||''} placeholder="es. 12"
+              <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={veicoloModal.consumoMedio||''} placeholder="es. 12"
                 onFocus={e=>e.target.select()}
                 onChange={e=>setVeicoloModal(m=>({...m,consumoMedio:+e.target.value||0}))}/>
             </div>
@@ -3436,7 +3436,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
                 {/* Anno (sempre visibile) */}
                 <div className="field">
                   <label className="field-label">Anno</label>
-                  <input type="number" className="field-input" value={t.anno||anno} min="2020" max="2035"
+                  <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={t.anno||anno} min="2020" max="2035"
                     onFocus={e=>e.target.select()} onChange={e=>setTar(()=>({...t,anno:+e.target.value||anno}))}/>
                 </div>
                 {/* Mese — solo se tipo=mese */}
@@ -3467,7 +3467,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
                   ['soggiorno','🏛️ Soggiorno €/pers/notte'],['doccia','🚿 Doccia €/doccia']].map(([k,lbl])=>(
                   <div key={k} className="field">
                     <label className="field-label">{lbl}</label>
-                    <input type="number" className="field-input" value={t[k]||''} placeholder="0"
+                    <input type="number" className="field-input" autoComplete="off" data-form-type="other" value={t[k]||''} placeholder="0"
                       onFocus={e=>e.target.select()} onChange={e=>setTar(()=>({...t,[k]:+e.target.value||0}))}/>
                   </div>
                 ))}
@@ -4424,7 +4424,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v10.1 · Firebase · GitHub Pages
+        CamperHub v10.8 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4967,7 +4967,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.1</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.8</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
