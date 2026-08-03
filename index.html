@@ -1664,7 +1664,8 @@ function StrutturaPicker({strutture, strutturaId, strutturaText, onSelect, onAdd
       <div style={{display:'flex',gap:6}}>
         <input type="text" className="field-input" style={{flex:1}}
           value={q} placeholder="Cerca per nome..."
-          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+          autoComplete="off" autoCorrect="off" autoCapitalize="off"
+          spellCheck={false} inputMode="search"
           onChange={e=>{setQ(e.target.value);setOpen(true);}}
           onFocus={()=>setOpen(true)}/>
         {selSt&&<button className="btn" style={{flexShrink:0,fontSize:11,padding:'6px 8px',color:'var(--text3)'}}
@@ -1738,6 +1739,7 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
     costoDoccia:   initial.costoDoccia||0,
     extraStruttura:initial.extraStruttura||0,
     costoTraghetto:initial.costoTraghetto||0,
+    pedaggi:       initial.pedaggi||0,
     traghettoGiorno:initial.traghettoGiorno||'partenza',
     budgetAllocato:initial.budgetAllocato||0,
     kmTappa:       initial.kmTappa||0,
@@ -1749,6 +1751,7 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
     costoPiazzola:0, costoPersona:0, numeroPersone:2,
     elettricita:0, moto:0, tassaSoggiorno:0, costoDoccia:0, extraStruttura:0,
     costoTraghetto:0, traghettoGiorno:'partenza',
+    pedaggi:0,
     budgetAllocato:0, kmTappa:0, prezzoLitro:0, costoCarburante:0
   });
   const u=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -1822,14 +1825,19 @@ function TappaModal({viaggio, onClose, onSave, initial, strutture=[], onAddStrut
         <NumField label="Budget allocato € (opzionale)"    value={f.budgetAllocato} onChange={v=>u("budgetAllocato",v)} placeholder="0 = non definito"/>
       </div>
 
-      {/* Sezione traghetto */}
+      {/* Sezione traghetto e pedaggi */}
       <div style={{marginTop:16}}>
-        <div className="section-title" style={{marginBottom:10}}>🚢 Traghetto</div>
+        <div className="section-title" style={{marginBottom:10}}>🚢 Traghetto · 🛣️ Pedaggi</div>
         <div className="form-grid" style={{gap:10}}>
-          <div className="field" style={{gridColumn:'1/-1'}}>
-            <label className="field-label">Costo traghetto € (0 = nessuno) — inserito nel giorno di check-in</label>
+          <div className="field">
+            <label className="field-label">Traghetto € — giorno check-in</label>
             <input type="number" className="field-input" value={f.costoTraghetto||""} placeholder="0"
               onFocus={e=>e.target.select()} onChange={e=>u("costoTraghetto",+e.target.value||0)}/>
+          </div>
+          <div className="field">
+            <label className="field-label">Pedaggi € — giorno check-in</label>
+            <input type="number" className="field-input" value={f.pedaggi||""} placeholder="0"
+              onFocus={e=>e.target.select()} onChange={e=>u("pedaggi",+e.target.value||0)}/>
           </div>
         </div>
       </div>
@@ -1920,7 +1928,8 @@ function VeicoloPicker({veicoli, veicoloId, veicoloText, onSelect, onAddNew}){
       <div style={{display:'flex',gap:6}}>
         <input type="text" className="field-input" style={{flex:1}}
           value={q} placeholder="Cerca o inserisci nome/targa..."
-          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+          autoComplete="off" autoCorrect="off" autoCapitalize="off"
+          spellCheck={false} inputMode="search"
           onChange={e=>{setQ(e.target.value);setOpen(true);}}
           onFocus={()=>setOpen(true)}/>
         {selV&&<button className="btn" style={{flexShrink:0,fontSize:11,padding:'6px 8px',color:'var(--text3)'}}
@@ -2375,7 +2384,8 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       copy[tab][sIdx]={...copy[tab][sIdx], km: n(form.kmTappa)};
     if(n(form.costoCarburante)>0)
       copy[tab][sIdx]={...copy[tab][sIdx], gasolio: n(form.costoCarburante)};
-    // Traghetto → sempre sul giorno di check-in (appartiene alla tappa che arriva)
+    if(n(form.pedaggi)>0)
+      copy[tab][sIdx]={...copy[tab][sIdx], pedaggi: n(form.pedaggi)};
     if(n(form.costoTraghetto)>0)
       copy[tab][sIdx]={...copy[tab][sIdx], traghetto: n(copy[tab][sIdx].traghetto) + n(form.costoTraghetto)};
 
@@ -2436,7 +2446,7 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     // ── SHORT-CIRCUIT: nessun campo giornaliero cambiato → solo metadata ──
     const DAILY_FIELDS = ['startDate','endDate','luogo','struttura','costoPiazzola',
       'costoPersona','numeroPersone','elettricita','moto','tassaSoggiorno',
-      'costoDoccia','extraStruttura','kmTappa','costoCarburante','costoTraghetto','traghettoGiorno'];
+      'costoDoccia','extraStruttura','kmTappa','costoCarburante','costoTraghetto','traghettoGiorno','pedaggi'];
     const normF = (k,v) => {
       if(v===undefined||v===null){ if(k==='traghettoGiorno') return 'partenza'; return ''; }
       return String(v);
@@ -2468,9 +2478,10 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
       }
       // Auto-repair: se il valore è sul giorno check-in ma errato (es. azzerato da migrazione T8)
       const curD2 = copy[tab][sIdx];
-      const wantKm2 = n(oldTappa.kmTappa||0), wantGas2 = n(oldTappa.costoCarburante||0);
+      const wantKm2 = n(oldTappa.kmTappa||0), wantGas2 = n(oldTappa.costoCarburante||0), wantPed2 = n(oldTappa.pedaggi||0);
       if(wantKm2 >0 && n(curD2.km)      !==wantKm2)  copy[tab][sIdx]={...copy[tab][sIdx], km:      wantKm2};
       if(wantGas2>0 && n(copy[tab][sIdx].gasolio)!==wantGas2) copy[tab][sIdx]={...copy[tab][sIdx], gasolio: wantGas2};
+      if(wantPed2>0 && n(copy[tab][sIdx].pedaggi)!==wantPed2) copy[tab][sIdx]={...copy[tab][sIdx], pedaggi: wantPed2};
 
       updateTrip(copy);
       setEditingTappa(null);
@@ -2526,9 +2537,9 @@ function TripView({viaggio, updateTrip, back, user, onShare, gruppiEsistenti=[],
     }
     if(pagamentoCheckoutPrev>0) copy[tab][sIdx]={...copy[tab][sIdx], pagamentoCheckoutPrev, prevIdTappa};
 
-    // km/gasolio/traghetto → tutti su sIdx (check-in), attribuiti alla tappa corretta
     if(n(form.kmTappa)>0)        copy[tab][sIdx]={...copy[tab][sIdx], km:       n(form.kmTappa)};
     if(n(form.costoCarburante)>0) copy[tab][sIdx]={...copy[tab][sIdx], gasolio:  n(form.costoCarburante)};
+    if(n(form.pedaggi)>0)         copy[tab][sIdx]={...copy[tab][sIdx], pedaggi:  n(form.pedaggi)};
     if(n(form.costoTraghetto)>0)  copy[tab][sIdx]={...copy[tab][sIdx], traghetto:n(form.costoTraghetto)};
     updateTrip(copy);
     setEditingTappa(null);
