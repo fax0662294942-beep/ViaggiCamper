@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v10.8</title>
+<title>🚐 CamperHub v10.9</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -488,7 +488,7 @@ const mkDispensaDoc = (uid, email) => ({
   categories:DISP_CATS_DEFAULT, products:mkDispProds(),
   spesaManuale:[], persone:DISP_PERS_DEFAULT,
   valigie:[], valigieProdotti:[],
-  tags:[], luoghi:[], strutture:[], veicoli:[],
+  tags:[], luoghi:[], strutture:[], veicoli:[], defaultVeicoloId:null,
 });
 const dsStatusLabel = s => s==='ok'?'✅ OK':s==='low'?'⚠️ Scarso':'❌ Mancante';
 const dsStatusClass = s => s==='ok'?'ds-ok':s==='low'?'ds-low':'ds-out';
@@ -1981,8 +1981,9 @@ function VeicoloPicker({veicoli, veicoloId, veicoloText, onSelect, onAddNew}){
 }
 
 // ── New / Edit Trip Modal ─────────────────────────────────────────────────
-function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti=[], sottogruppiMap={}, veicoli=[], onAddVeicolo}){
+function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti=[], sottogruppiMap={}, veicoli=[], onAddVeicolo, defaultVeicoloId=null}){
   const today = new Date().toISOString().slice(0,10);
+  const defV = !initial && defaultVeicoloId ? veicoli.find(v=>v.id===defaultVeicoloId) : null;
   const [f,setF] = React.useState(initial ? {
     nome: initial.nome||(isCopy?initial.nome+' (copia)':''),
     budget: initial.budget||1000,
@@ -1994,7 +1995,9 @@ function TripFormModal({initial, title, onClose, onSave, isCopy, gruppiEsistenti
     status: initial.status||'ipotesi',
     gruppo: initial.gruppo||'',
     sottogruppo: initial.sottogruppo||'',
-  } : {nome:'',budget:1000,startDate:today,endDate:addDays(today,6),veicolo:'',veicoloId:null,consumoMedio:0,status:'ipotesi',gruppo:'',sottogruppo:''});
+  } : {nome:'',budget:1000,startDate:today,endDate:addDays(today,6),
+    veicolo: defV?.nome||'', veicoloId: defV?.id||null, consumoMedio: defV?.consumoMedio||0,
+    status:'ipotesi',gruppo:'',sottogruppo:''});
   const [nuovoGruppo, setNuovoGruppo] = React.useState(
     !!(initial?.gruppo && !gruppiEsistenti.includes(initial.gruppo))
   );
@@ -2973,11 +2976,71 @@ function AssignSottogruppoModal({viaggi, gruppiEsistenti, sottogruppiMap, update
   );
 }
 
+// ── MoveTripModal ────────────────────────────────────────────────────────────
+function MoveTripModal({viaggio, gruppiEsistenti, sottogruppiMap, updateTrip, onClose}){
+  const [grp, setGrp]  = React.useState(viaggio.gruppo||'');
+  const [sg,  setSg]   = React.useState(viaggio.sottogruppo||'');
+  const [nuovoGrp, setNuovoGrp] = React.useState(false);
+  const sgList = grp ? (sottogruppiMap[grp]||[]) : [];
+  const save = () => {
+    updateTrip({...viaggio, gruppo:grp.trim(), sottogruppo:sg.trim()});
+    onClose();
+  };
+  return(
+    <Modal title="↔️ Sposta viaggio" onClose={onClose} width="400px">
+      <div style={{fontSize:12,color:'var(--text2)',marginBottom:12}}>
+        <strong>{viaggio.nome}</strong>
+      </div>
+      <div className="field" style={{marginBottom:10}}>
+        <label className="field-label">📁 Gruppo</label>
+        {!nuovoGrp ? (
+          <select className="field-input" value={grp} onChange={e=>{
+            if(e.target.value==='__nuovo__'){setNuovoGrp(true);setGrp('');}
+            else{setGrp(e.target.value);setSg('');}
+          }}>
+            <option value="">— Nessun gruppo —</option>
+            {gruppiEsistenti.map(g=><option key={g} value={g}>{g}</option>)}
+            <option value="__nuovo__">➕ Nuovo gruppo...</option>
+          </select>
+        ) : (
+          <div style={{display:'flex',gap:8}}>
+            <input className="field-input" style={{flex:1}} autoFocus
+              value={grp} onChange={e=>setGrp(e.target.value)} placeholder="Nome nuovo gruppo"/>
+            <button className="btn" style={{flexShrink:0}} onClick={()=>{setNuovoGrp(false);setGrp('');}}>←</button>
+          </div>
+        )}
+      </div>
+      {grp&&(
+        <div className="field" style={{marginBottom:14}}>
+          <label className="field-label">📂 Sotto-gruppo (opzionale)</label>
+          <select className="field-input" value={sg} onChange={e=>setSg(e.target.value==='__nessuno__'?'':e.target.value)}>
+            <option value="__nessuno__">— Nessun sotto-gruppo —</option>
+            {sgList.map(s=><option key={s} value={s}>{s}</option>)}
+            {sg&&!sgList.includes(sg)&&<option value={sg}>{sg} (corrente)</option>}
+          </select>
+          {sgList.length===0&&(
+            <input className="field-input" style={{marginTop:6}} value={sg} onChange={e=>setSg(e.target.value)} placeholder="Digita un nuovo sotto-gruppo..."/>
+          )}
+        </div>
+      )}
+      <div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>
+        {grp ? <>Il viaggio sarà in: 📁 {grp}{sg?` › 📂 ${sg}`:''}</> : 'Il viaggio sarà senza gruppo'}
+      </div>
+      <div className="btn-row">
+        <button className="btn-primary" onClick={save}>✓ Sposta</button>
+        <button className="btn" onClick={onClose}>Annulla</button>
+      </div>
+    </Modal>
+  );
+}
+
 // ── GruppiManager ────────────────────────────────────────────────────────
-function GruppiManager({gruppi, viaggi, updateTrip, onClose}){
-  const [editId, setEditId]   = React.useState(null);  // nome gruppo in editing
+function GruppiManager({gruppi, viaggi, updateTrip, onClose, sottogruppiMap={}}){
+  const [editId, setEditId]   = React.useState(null);
   const [newName, setNewName] = React.useState('');
-  const [confirm, setConfirm] = React.useState(null);  // gruppo da eliminare
+  const [confirm, setConfirm] = React.useState(null);
+  const [showDeclassa, setShowDeclassa] = React.useState(null);
+  const [declassaTarget, setDeclassaTarget] = React.useState('');
 
   const renameGruppo = (oldName, name) => {
     const trimmed = name.trim();
@@ -2987,57 +3050,86 @@ function GruppiManager({gruppi, viaggi, updateTrip, onClose}){
     setEditId(null);
   };
   const deleteGruppo = (name) => {
-    viaggi.filter(v=>(v.gruppo||'').trim()===name).forEach(v=>updateTrip({...v,gruppo:''}));
+    viaggi.filter(v=>(v.gruppo||'').trim()===name).forEach(v=>updateTrip({...v,gruppo:'',sottogruppo:''}));
     setConfirm(null);
+  };
+  const promuoviSG = (gruppo, sg) => {
+    viaggi.filter(v=>(v.gruppo||'').trim()===gruppo&&(v.sottogruppo||'').trim()===sg)
+      .forEach(v=>updateTrip({...v,gruppo:sg,sottogruppo:''}));
+  };
+  const eliminaSG = (gruppo, sg) => {
+    viaggi.filter(v=>(v.gruppo||'').trim()===gruppo&&(v.sottogruppo||'').trim()===sg)
+      .forEach(v=>updateTrip({...v,sottogruppo:''}));
+  };
+  const declassaGruppo = (grp, target) => {
+    viaggi.filter(v=>(v.gruppo||'').trim()===grp)
+      .forEach(v=>updateTrip({...v,gruppo:target,sottogruppo:grp}));
+    setShowDeclassa(null);
   };
 
   return(
-    <Modal title="📁 Gestisci Gruppi" onClose={onClose} width="420px">
-      {gruppi.length===0&&(
-        <div style={{textAlign:'center',color:'var(--text3)',fontSize:13,padding:'20px 0'}}>
-          Nessun gruppo creato.<br/>Aggiungilo dal form del viaggio.
-        </div>
-      )}
+    <Modal title="📁 Gestisci Gruppi" onClose={onClose} width="480px">
+      {gruppi.length===0&&<div style={{textAlign:'center',color:'var(--text3)',fontSize:13,padding:'20px 0'}}>Nessun gruppo creato.</div>}
       {gruppi.map(g=>{
-        const count = viaggi.filter(v=>(v.gruppo||'').trim()===g).length;
-        const isEdit = editId===g;
+        const count=viaggi.filter(v=>(v.gruppo||'').trim()===g).length;
+        const sgs=sottogruppiMap[g]||[];
+        const isEdit=editId===g;
+        const altriGruppi=gruppi.filter(x=>x!==g);
         return(
           <div key={g} style={{marginBottom:10,borderRadius:10,border:'1px solid var(--border)',overflow:'hidden'}}>
             {isEdit
-              ? <div style={{display:'flex',gap:8,padding:'10px 12px',alignItems:'center'}}>
-                  <input autoFocus className="field-input" style={{flex:1,fontSize:13,padding:'6px 10px'}}
-                    value={newName} onChange={e=>setNewName(e.target.value)}
-                    onKeyDown={e=>{if(e.key==='Enter')renameGruppo(g,newName);if(e.key==='Escape')setEditId(null);}}
-                    placeholder="Nuovo nome"/>
-                  <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>renameGruppo(g,newName)}>✓</button>
-                  <button className="btn" style={{padding:'6px 10px',fontSize:12}} onClick={()=>setEditId(null)}>✕</button>
+              ?<div style={{display:'flex',gap:8,padding:'10px 12px',alignItems:'center'}}>
+                <input autoFocus className="field-input" style={{flex:1,fontSize:13,padding:'6px 10px'}}
+                  value={newName} onChange={e=>setNewName(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter')renameGruppo(g,newName);if(e.key==='Escape')setEditId(null);}}
+                  placeholder="Nuovo nome"/>
+                <button className="btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>renameGruppo(g,newName)}>✓</button>
+                <button className="btn" style={{padding:'6px 10px',fontSize:12}} onClick={()=>setEditId(null)}>✕</button>
+               </div>
+              :<div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px'}}>
+                <span style={{fontSize:18}}>📁</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:700}}>{g}</div>
+                  <div style={{fontSize:11,color:'var(--text3)'}}>{count} viag.{sgs.length>0?` · ${sgs.length} sotto-gruppi`:''}</div>
                 </div>
-              : <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px'}}>
-                  <span style={{fontSize:18}}>📁</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:600}}>{g}</div>
-                    <div style={{fontSize:11,color:'var(--text3)'}}>{count} {count===1?'viaggio':'viaggi'}</div>
-                  </div>
-                  <button className="btn-icon btn-sm" title="Rinomina"
-                    onClick={()=>{setEditId(g);setNewName(g);}}>✏️</button>
-                  <button className="btn-icon btn-sm" style={{color:'var(--red)'}} title="Elimina gruppo"
-                    onClick={()=>setConfirm(g)}>🗑️</button>
-                </div>
+                <button className="btn-icon btn-sm" onClick={()=>{setEditId(g);setNewName(g);}}>✏️</button>
+                {altriGruppi.length>0&&<button className="btn" style={{fontSize:10,padding:'3px 8px'}} title="Fai diventare sotto-gruppo di..."
+                  onClick={()=>{setShowDeclassa(g);setDeclassaTarget(altriGruppi[0]);}}>📂↓</button>}
+                <button className="btn-icon btn-sm" style={{color:'var(--red)'}} onClick={()=>setConfirm(g)}>🗑️</button>
+               </div>
             }
+            {sgs.length>0&&<div style={{borderTop:'1px solid var(--border)',background:'var(--bg2)'}}>
+              {sgs.map(sg=>{
+                const sgC=viaggi.filter(v=>(v.gruppo||'').trim()===g&&(v.sottogruppo||'').trim()===sg).length;
+                return(<div key={sg} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 14px 7px 28px',borderBottom:'1px solid var(--border)'}}>
+                  <span style={{fontSize:14}}>📂</span>
+                  <div style={{flex:1,fontSize:12}}><span style={{fontWeight:600}}>{sg}</span><span style={{color:'var(--text3)',marginLeft:6}}>{sgC} viag.</span></div>
+                  <button className="btn" style={{fontSize:10,padding:'3px 8px'}} title="Promuovi a gruppo autonomo" onClick={()=>promuoviSG(g,sg)}>📁↑</button>
+                  <button className="btn-icon btn-sm" style={{fontSize:12,color:'var(--red)'}} title="Rimuovi sotto-gruppo" onClick={()=>eliminaSG(g,sg)}>✕</button>
+                </div>);
+              })}
+            </div>}
+            {showDeclassa===g&&<div style={{background:'rgba(79,216,180,.07)',borderTop:'1px solid var(--border)',padding:'10px 14px'}}>
+              <div style={{fontSize:12,marginBottom:8}}>Fai diventare <strong>"{g}"</strong> sotto-gruppo di:</div>
+              <div style={{display:'flex',gap:8}}>
+                <select className="field-input" style={{flex:1,fontSize:12}} value={declassaTarget} onChange={e=>setDeclassaTarget(e.target.value)}>
+                  {altriGruppi.map(x=><option key={x} value={x}>{x}</option>)}
+                </select>
+                <button className="btn-primary" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>declassaGruppo(g,declassaTarget)}>✓</button>
+                <button className="btn" style={{fontSize:12,padding:'6px 10px'}} onClick={()=>setShowDeclassa(null)}>✕</button>
+              </div>
+            </div>}
           </div>
         );
       })}
-      {confirm&&(
-        <div style={{background:'rgba(240,96,96,.1)',border:'1px solid rgba(240,96,96,.3)',borderRadius:10,padding:'12px 14px',marginTop:10}}>
-          <div style={{fontSize:13,marginBottom:10}}>Eliminare il gruppo <strong>"{confirm}"</strong>?<br/>
-            <span style={{fontSize:11,color:'var(--text3)'}}>I {viaggi.filter(v=>(v.gruppo||'').trim()===confirm).length} viaggi perderanno il gruppo ma non verranno eliminati.</span>
-          </div>
-          <div style={{display:'flex',gap:8}}>
-            <button className="btn" style={{flex:1,color:'var(--red)',fontSize:12}} onClick={()=>deleteGruppo(confirm)}>Elimina</button>
-            <button className="btn" style={{flex:1,fontSize:12}} onClick={()=>setConfirm(null)}>Annulla</button>
-          </div>
+      {confirm&&<div style={{background:'rgba(240,96,96,.1)',border:'1px solid rgba(240,96,96,.3)',borderRadius:10,padding:'12px 14px',marginTop:10}}>
+        <div style={{fontSize:13,marginBottom:10}}>Eliminare <strong>"{confirm}"</strong>?<br/>
+          <span style={{fontSize:11,color:'var(--text3)'}}>I viaggi resteranno ma perderanno il gruppo.</span></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn" style={{flex:1,color:'var(--red)',fontSize:12}} onClick={()=>deleteGruppo(confirm)}>Elimina</button>
+          <button className="btn" style={{flex:1,fontSize:12}} onClick={()=>setConfirm(null)}>Annulla</button>
         </div>
-      )}
+      </div>}
       <div className="btn-row" style={{marginTop:14}}>
         <button className="btn" onClick={onClose}>Chiudi</button>
       </div>
@@ -3045,7 +3137,7 @@ function GruppiManager({gruppi, viaggi, updateTrip, onClose}){
   );
 }
 
-function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip, strutture=[], onUpdateStrutture, veicoli=[], onUpdateVeicoli}){
+function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip, strutture=[], onUpdateStrutture, veicoli=[], onUpdateVeicoli, defaultVeicoloId=null, onSetDefaultVeicolo}){
   useBack(onBack);
   const [statusFil, setStatusFil] = React.useState('all');
   const [expandedY,  setExpandedY]  = React.useState({});
@@ -3058,6 +3150,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
   const [strModal,   setStrModal]   = React.useState(null);
   const [veicoloModal, setVeicoloModal] = React.useState(null);
   const [showAssignSG, setShowAssignSG] = React.useState(false);
+  const [moveTrip, setMoveTrip] = React.useState(null); // viaggio da spostare
 
   const toggleStatus = (v) => {
     const newStatus = (v.status||'ipotesi')==='ipotesi' ? 'confermato' : 'ipotesi';
@@ -3180,16 +3273,39 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
           {/* Lista veicoli */}
           {strSub==='veicoli'&&(<>
             {veicoli.length===0&&<div className="empty" style={{paddingTop:30}}><div className="empty-icon">🚐</div><p>Nessun veicolo censito.<br/>Tocca "＋ Veicolo".</p></div>}
-            {veicoli.map(v=>(
-              <div key={v.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px',display:'flex',alignItems:'center',gap:12}}>
-                <span style={{fontSize:24}}>{v.icona||'🚐'}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:700}}>{v.nome}</div>
-                  <div style={{fontSize:11,color:'var(--text3)'}}>⛽ {v.consumoMedio} l/100km{v.note?` · ${v.note}`:''}</div>
-                </div>
-                <button className="btn-icon btn-sm" onClick={()=>setVeicoloModal({...v})}>✏️</button>
+            {defaultVeicoloId&&veicoli.find(v=>v.id===defaultVeicoloId)&&(
+              <div style={{fontSize:11,color:'var(--primary)',marginBottom:8,padding:'6px 12px',background:'var(--primary-faint)',borderRadius:8}}>
+                ⭐ Predefinito: <strong>{veicoli.find(v=>v.id===defaultVeicoloId)?.nome}</strong> — viene proposto in tutti i nuovi viaggi
               </div>
-            ))}
+            )}
+            {veicoli.map(v=>{
+              const isDefault = v.id===defaultVeicoloId;
+              return(
+                <div key={v.id} className="card-sm" style={{marginBottom:10,padding:'12px 14px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:24}}>{v.icona||'🚐'}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:700,display:'flex',alignItems:'center',gap:6}}>
+                        {v.nome}
+                        {isDefault&&<span style={{fontSize:10,background:'var(--primary)',color:'var(--bg)',padding:'1px 7px',borderRadius:10,fontWeight:700}}>⭐ predefinito</span>}
+                      </div>
+                      <div style={{fontSize:11,color:'var(--text3)'}}>⛽ {v.consumoMedio} l/100km{v.note?` · ${v.note}`:''}</div>
+                    </div>
+                    <div style={{display:'flex',gap:6,flexShrink:0}}>
+                      {!isDefault&&<button className="btn" style={{fontSize:10,padding:'4px 8px'}}
+                        onClick={()=>onSetDefaultVeicolo&&onSetDefaultVeicolo(v.id)}>
+                        ⭐
+                      </button>}
+                      {isDefault&&<button className="btn" style={{fontSize:10,padding:'4px 8px',color:'var(--text3)'}}
+                        onClick={()=>onSetDefaultVeicolo&&onSetDefaultVeicolo(null)} title="Rimuovi predefinito">
+                        ✕⭐
+                      </button>}
+                      <button className="btn-icon btn-sm" onClick={()=>setVeicoloModal({...v})}>✏️</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </>)}
         </div>
       )}
@@ -3268,6 +3384,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
                           <div style={{display:'flex',gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
                             <button className="btn-icon btn-sm" title="Copia" onClick={()=>setCopyData(v)} style={{fontSize:13,padding:'4px 5px'}}>📋</button>
                             <button className="btn-icon btn-sm" style={{color:'var(--primary)',padding:'4px 5px'}} onClick={()=>setShare(v)} title="Condividi">👥</button>
+                            <button className="btn-icon btn-sm" style={{color:'var(--text2)',padding:'4px 5px'}} title="Sposta" onClick={()=>setMoveTrip(v)}>↔️</button>
                             {v.ownerId===user.uid
                               ? <button className="btn-icon btn-sm" style={{color:'var(--red)',padding:'4px 5px'}} onClick={()=>setDel(v.id)}>🗑</button>
                               : <span title="Viaggio condiviso — solo il proprietario può eliminarlo" style={{fontSize:13,opacity:.4,padding:'4px 5px',cursor:'default'}}>🔒</span>}
@@ -3328,7 +3445,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
         </div>
       </div>)}
 
-      {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} veicoli={veicoli}
+      {showNew&&<TripFormModal title="Nuovo viaggio" gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} veicoli={veicoli} defaultVeicoloId={defaultVeicoloId}
         onAddVeicolo={(nome,cb)=>{const nv={id:'veh_'+Date.now(),nome,icona:'🚐',consumoMedio:0,note:''};if(onUpdateVeicoli)onUpdateVeicoli([...veicoli,nv]);cb(nv);}}
         onClose={()=>setNew(false)} onSave={f=>{addTrip(f);setNew(false);}}/>}
       {copyData&&<TripFormModal title="📋 Copia viaggio" isCopy gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} veicoli={veicoli}
@@ -3338,8 +3455,9 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
       {delId&&<Confirm msg={`Eliminare "${(viaggi.find(v=>v.id===delId)||{}).nome}"? Tutti i dati andranno persi.`}
         onOk={()=>{removeTrip(delId);setDel(null);}} onClose={()=>setDel(null)}/>}
       {showShare&&<ShareModal viaggio={showShare} user={user} onClose={()=>setShare(null)}/>}
-      {showGruppi&&<GruppiManager gruppi={gruppiEsistenti} viaggi={viaggi} updateTrip={updateTrip} onClose={()=>setShowGruppi(false)}/>}
+      {showGruppi&&<GruppiManager gruppi={gruppiEsistenti} viaggi={viaggi} updateTrip={updateTrip} sottogruppiMap={sottogruppiMap} onClose={()=>setShowGruppi(false)}/>}
       {showAssignSG&&<AssignSottogruppoModal viaggi={viaggi} gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} updateTrip={updateTrip} onClose={()=>setShowAssignSG(false)}/>}
+      {moveTrip&&<MoveTripModal viaggio={moveTrip} gruppiEsistenti={gruppiEsistenti} sottogruppiMap={sottogruppiMap} updateTrip={updateTrip} onClose={()=>setMoveTrip(null)}/>}
 
       {/* Modal Veicolo */}
       {veicoloModal&&(
@@ -4424,7 +4542,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v10.8 · Firebase · GitHub Pages
+        CamperHub v10.9 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4916,6 +5034,8 @@ function App(){
   const onUpdateStrutture = list => { if(dispId) updateDispensa({...dispensa, strutture:list}); };
   const veicoli = dispensa?.veicoli || [];
   const onUpdateVeicoli = list => { if(dispId) updateDispensa({...dispensa, veicoli:list}); };
+  const defaultVeicoloId = dispensa?.defaultVeicoloId || null;
+  const onSetDefaultVeicolo = id => { if(dispId) updateDispensa({...dispensa, defaultVeicoloId:id}); };
   const signOut = () => firebase.auth().signOut();
 
   // Loading
@@ -4953,6 +5073,7 @@ function App(){
       addTrip={addTrip} removeTrip={removeTrip} updateTrip={updateTrip}
       strutture={strutture} onUpdateStrutture={onUpdateStrutture}
       veicoli={veicoli} onUpdateVeicoli={onUpdateVeicoli}
+      defaultVeicoloId={defaultVeicoloId} onSetDefaultVeicolo={onSetDefaultVeicolo}
     />
   );
 
@@ -4967,7 +5088,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.8</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.9</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
