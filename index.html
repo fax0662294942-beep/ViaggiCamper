@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v11.0</title>
+<title>🚐 CamperHub v11.1</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3185,7 +3185,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
   const years = Object.keys(byYear).sort((a,b)=>b-a);
   const isExpY = y   => expandedY[y]!==false;
   const isExpG = key => expandedG[key]===true;
-  const isExpSG= key => expandedSG[key]!==false; // sottogruppo: default espanso
+  const isExpSG= key => expandedSG[key]===true; // sottogruppo: default collassato
   const togY   = y   => setExpandedY(p=>({...p,[y]:!isExpY(y)}));
   const togG   = key => setExpandedG(p=>({...p,[key]:!isExpG(key)}));
   const togSG  = key => setExpandedSG(p=>({...p,[key]:!isExpSG(key)}));
@@ -4555,7 +4555,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v11.0 · Firebase · GitHub Pages
+        CamperHub v11.1 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -5110,7 +5110,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v11.0</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v11.1</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={toggleTheme} title={theme==='dark'?'Tema chiaro':'Tema scuro'}
             style={{fontSize:16}}>
