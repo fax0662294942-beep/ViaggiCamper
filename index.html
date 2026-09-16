@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v10.9</title>
+<title>🚐 CamperHub v11.0</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -37,6 +37,18 @@ firebase.firestore().enablePersistence().catch(()=>{});
   --red:#f06060; --red-faint:rgba(240,96,96,0.10);
   --green:#52d68a;
   --text:#d8eee4; --text2:#8aaa96; --text3:#4a6a58;
+  --input:var(--bg2);
+}
+[data-theme="light"]{
+  --bg:#f0f5f2; --bg2:#e6efea; --card:#ffffff; --card2:#f5f9f6;
+  --border:#c8dcd2; --border2:#b8cec4;
+  --primary:#1e9e78; --primary-dim:#1a8a68; --primary-faint:rgba(30,158,120,0.10);
+  --accent:#c97820; --accent-faint:rgba(201,120,32,0.10);
+  --red:#c03030; --red-faint:rgba(192,48,48,0.10);
+  --green:#1a8a46;
+  --text:#0e2018; --text2:#3a6050; --text3:#7a9e8c;
+  --input:#eaf2ee;
+}
   --col-s0:#18281e; --col-s1:#1c2e24; /* struttura */
   --col-v0:#18222a; --col-v1:#1c2832; /* viaggio */
   --col-c0:#26201a; --col-c1:#2c261e; /* cibo */
@@ -3137,7 +3149,7 @@ function GruppiManager({gruppi, viaggi, updateTrip, onClose, sottogruppiMap={}})
   );
 }
 
-function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip, strutture=[], onUpdateStrutture, veicoli=[], onUpdateVeicoli, defaultVeicoloId=null, onSetDefaultVeicolo}){
+function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew, delId, setDel, showShare, setShare, addTrip, removeTrip, updateTrip, strutture=[], onUpdateStrutture, veicoli=[], onUpdateVeicoli, defaultVeicoloId=null, onSetDefaultVeicolo, theme='dark', toggleTheme}){
   useBack(onBack);
   const [statusFil, setStatusFil] = React.useState('all');
   const [expandedY,  setExpandedY]  = React.useState({});
@@ -3202,6 +3214,7 @@ function ViaggiaSection({viaggi, onBack, onOpen, signOut, user, showNew, setNew,
           {vsView==='viaggi'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setNew(true)}>＋ Nuovo</button>}
           {vsView==='strutture'&&strSub==='strutture'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setStrModal({data:{id:null,nome:'',note:'',tariffe:[]}})}>＋ Struttura</button>}
           {vsView==='strutture'&&strSub==='veicoli'&&<button className="btn-primary" style={{padding:'6px 10px',fontSize:12,flexShrink:0}} onClick={()=>setVeicoloModal({id:null,nome:'',icona:'🚐',consumoMedio:0,note:''})}>＋ Veicolo</button>}
+          {toggleTheme&&<button className="btn-icon" onClick={toggleTheme} title={theme==='dark'?'Tema chiaro':'Tema scuro'} style={{fontSize:16,flexShrink:0}}>{theme==='dark'?'☀️':'🌙'}</button>}
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16,flexShrink:0}}>🚪</button>
         </div>
       </div>
@@ -4542,7 +4555,7 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v10.9 · Firebase · GitHub Pages
+        CamperHub v11.0 · Firebase · GitHub Pages
       </div>
     </div>
   );
@@ -4964,6 +4977,14 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
 // ── Home View / App ────────────────────────────────────────────────────────
 function App(){
   const [user,setUser]         = React.useState(undefined);
+  const [theme, setTheme]      = React.useState(()=>localStorage.getItem('camperhub_theme')||'dark');
+
+  React.useEffect(()=>{
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('camperhub_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t==='dark'?'light':'dark');
   const [viaggi,setViaggi]     = React.useState([]);
   const [dispensa,setDispensa] = React.useState(null);
   const [dispId,setDispId]     = React.useState(null);
@@ -5074,6 +5095,7 @@ function App(){
       strutture={strutture} onUpdateStrutture={onUpdateStrutture}
       veicoli={veicoli} onUpdateVeicoli={onUpdateVeicoli}
       defaultVeicoloId={defaultVeicoloId} onSetDefaultVeicolo={onSetDefaultVeicolo}
+      theme={theme} toggleTheme={toggleTheme}
     />
   );
 
@@ -5088,8 +5110,12 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v10.9</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v11.0</span></div>
         <div className="header-actions">
+          <button className="btn-icon" onClick={toggleTheme} title={theme==='dark'?'Tema chiaro':'Tema scuro'}
+            style={{fontSize:16}}>
+            {theme==='dark'?'☀️':'🌙'}
+          </button>
           <button className="btn-icon" onClick={signOut} title="Esci" style={{fontSize:16}}>🚪</button>
         </div>
       </div>
