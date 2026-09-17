@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🚐 CamperHub v11.1</title>
+<title>🚐 CamperHub v11.2</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0c1210"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -4467,8 +4467,35 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
   };
 
   // ── TAB: IMPOSTAZIONI ─────────────────────────────────────────────────
-  const TabImpostazioni = () => (
+  const TabImpostazioni = () => {
+    const curTheme = document.documentElement.getAttribute('data-theme')||'dark';
+    const switchTheme = t => {
+      document.documentElement.setAttribute('data-theme',t);
+      localStorage.setItem('camperhub_theme',t);
+    };
+    return(
     <div>
+      <div className="section-title" style={{marginBottom:10}}>🎨 Tema</div>
+      <div className="card-sm" style={{padding:'14px 16px',marginBottom:18}}>
+        <div style={{fontSize:12,color:'var(--text2)',marginBottom:12}}>Scegli il tema dell'interfaccia</div>
+        <div style={{display:'flex',gap:10}}>
+          {[['dark','🌙','Scuro'],['light','☀️','Chiaro']].map(([k,ico,lbl])=>{
+            const sel=curTheme===k;
+            return(
+              <button key={k} onClick={()=>switchTheme(k)}
+                style={{flex:1,padding:'14px 8px',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',
+                  border:'2.5px solid '+(sel?'var(--primary)':'var(--border)'),
+                  background:sel?'var(--primary-faint)':'transparent',
+                  color:sel?'var(--primary)':'var(--text2)',
+                  display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
+                <span style={{fontSize:26}}>{ico}</span>
+                <span>{lbl}</span>
+                {sel&&<span style={{fontSize:10,background:'var(--primary)',color:'var(--bg)',padding:'2px 8px',borderRadius:10}}>attivo</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <div className="section-title" style={{marginBottom:10}}>👥 Persone</div>
       <div className="card-sm" style={{padding:'0 12px',marginBottom:12}}>
         {persone.map(p=>(
@@ -4555,10 +4582,11 @@ function DispensaView({dispensa, dispensaId, updateDispensa, user, onBack}){
         </button>
       </div>
       <div style={{marginTop:24,textAlign:'center',color:'var(--text3)',fontSize:11}}>
-        CamperHub v11.1 · Firebase · GitHub Pages
+        CamperHub v11.2 · Firebase · GitHub Pages
       </div>
     </div>
   );
+  };
 
   // ── MODALS ────────────────────────────────────────────────────────────
   const renderModal = () => {
@@ -5110,7 +5138,7 @@ function App(){
   return(
     <div>
       <div className="app-header">
-        <div className="logo">🚐 <strong>CamperHub</strong> <span>v11.1</span></div>
+        <div className="logo">🚐 <strong>CamperHub</strong> <span>v11.2</span></div>
         <div className="header-actions">
           <button className="btn-icon" onClick={toggleTheme} title={theme==='dark'?'Tema chiaro':'Tema scuro'}
             style={{fontSize:16}}>
